@@ -1,6 +1,9 @@
 using GrievanceSystem.Data;
 using Microsoft.EntityFrameworkCore;
 
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace GrievanceSystem
 {
@@ -14,6 +17,32 @@ namespace GrievanceSystem
             builder.Services.AddControllersWithViews();
             builder.Services.AddDbContext<AppDbContext>(options =>options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+            // JWT AUTHENTICATION START
+            builder.Services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+
+                    ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                    ValidAudience = builder.Configuration["Jwt:Audience"],
+
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])
+                    )
+                };
+            });
+            // JWT AUTHENTICATION END
+
+            builder.Services.AddAuthorization();
 
             var app = builder.Build();
 
@@ -26,15 +55,21 @@ namespace GrievanceSystem
             }
 
             app.UseHttpsRedirection();
+
+            app.UseDefaultFiles();
+            app.UseStaticFiles();
+
             app.UseRouting();
 
+            app.UseAuthentication();   // IMPORTANT: authentication must come before authorization
             app.UseAuthorization();
 
-            app.MapStaticAssets();
+            // Ensure attribute-routed API controllers are mapped
+            app.MapControllers();
+
             app.MapControllerRoute(
                 name: "default",
-                pattern: "{controller=Home}/{action=Index}/{id?}")
-                .WithStaticAssets();
+                pattern: "{controller=Home}/{action=Index}/{id?}");
 
             app.Run();
         }

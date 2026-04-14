@@ -1,5 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
-using GrievanceSystem.Models;
+﻿using GrievanceSystem.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace GrievanceSystem.Data
 {
@@ -11,7 +11,7 @@ namespace GrievanceSystem.Data
 
         }
 
-        //public DbSet<User> Users { get; set; }
+        public DbSet<User> Users { get; set; }
 
         public DbSet<Grievance> Grievances { get; set; }
     }
