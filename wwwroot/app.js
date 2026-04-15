@@ -93,9 +93,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             return response.json();
                         })
                         .then(data => {
-                            // Save token and role
+                            // Save token, role and email
                             localStorage.setItem('token', data.token);
                             localStorage.setItem('role', data.role);
+                            localStorage.setItem('email', email);
 
                             // Redirect based on role
                             if (data.role === 'Admin') {
@@ -404,95 +405,65 @@ document.addEventListener('DOMContentLoaded', () => {
         const tableBody = document.getElementById('adminTableBody');
         const adminAlert = document.getElementById('adminAlert');
 
-        function loadGrievances() {
-            fetch('https://localhost:44392/api/GrievanceApi', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-                .then(res => {
-                    if (res.status === 401) {
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('role');
-                        window.location.href = 'index.html';
-                        throw new Error('Unauthorized');
-                    }
-                    if (res.status === 403) {
-                        throw new Error('Access Denied: You do not have Admin privileges. Please login as an Admin.');
-                    }
-                    if (!res.ok) throw new Error('Failed to load grievances from the server.');
-                    return res.json();
-                })
-                .then(data => {
-                    if (!tableBody) return;
-                    tableBody.innerHTML = '';
+        // Cache all loaded rows for client-side filtering
+        let allAdminRows = [];
 
-                    if (data.length === 0) {
-                        tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No grievances found.</td></tr>';
-                        return;
-                    }
-
-                    let pendingCount = 0;
-                    let resolvedCount = 0;
-                    let rejectedCount = 0;
-
-                    data.forEach(item => {
-                        let statusBadge = '<span class="badge bg-secondary rounded-pill px-3 py-2">Unknown</span>';
-                        const statusLower = (item.status || 'Pending').toLowerCase();
-                        if (statusLower === 'pending') statusBadge = '<span class="badge bg-warning text-dark rounded-pill px-3 py-2">Pending</span>';
-                        else if (statusLower === 'in progress') statusBadge = '<span class="badge bg-primary rounded-pill px-3 py-2">In Progress</span>';
-                        else if (statusLower === 'resolved') statusBadge = '<span class="badge bg-success rounded-pill px-3 py-2">Resolved</span>';
-                        else if (statusLower === 'rejected') statusBadge = '<span class="badge bg-danger rounded-pill px-3 py-2">Rejected</span>';
-
-                        const initials = (item.name || 'U').substring(0, 2).toUpperCase();
-
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                        <td class="ps-4 font-monospace fw-bold text-dark">#${item.ticketNumber || item.id}</td>
-                        <td class="fw-medium">
-                            <div class="d-flex align-items-center">
-                                <div class="bg-secondary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 30px; height: 30px; font-size: 0.75rem; font-weight: bold;">${initials}</div> 
-                                ${item.name || 'N/A'}
-                            </div>
-                        </td>
-                        <td><a href="mailto:${item.email}" class="text-decoration-none text-muted">${item.email || 'N/A'}</a></td>
-                        <td class="text-truncate" style="max-width: 250px;" title="${item.subject || ''}">${item.subject || 'No Subject'}</td>
-                        <td class="text-center">${statusBadge}</td>
-                        <td class="pe-4 text-center">
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown">
-                                    Action
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-1">
-                                    <li><a class="dropdown-item fw-semibold py-2" href="#" onclick="updateTicketStatus('${item.id}', 'Pending'); return false;"><i class="fas fa-clock text-warning me-2"></i> Set Pending</a></li>
-                                    <li><a class="dropdown-item fw-semibold py-2" href="#" onclick="updateTicketStatus('${item.id}', 'In Progress'); return false;"><i class="fas fa-spinner text-primary me-2"></i> Set In Progress</a></li>
-                                    <li><a class="dropdown-item fw-semibold py-2" href="#" onclick="updateTicketStatus('${item.id}', 'Resolved'); return false;"><i class="fas fa-check-circle text-success me-2"></i> Set Resolved</a></li>
-                                </ul>
-                            </div>
-                        </td>
-                    `;
-                        tableBody.appendChild(tr);
-
-                        if (statusLower === 'pending' || statusLower === 'in progress') pendingCount++;
-                        else if (statusLower === 'resolved') resolvedCount++;
-                        else if (statusLower === 'rejected') rejectedCount++;
-                    });
-
-                    const pendEl = document.getElementById('pendingCount');
-                    if (pendEl) pendEl.textContent = pendingCount;
-                    const resEl = document.getElementById('resolvedCount');
-                    if (resEl) resEl.textContent = resolvedCount;
-                    const rejEl = document.getElementById('rejectedCount');
-                    if (rejEl) rejEl.textContent = rejectedCount;
-                })
-                .catch(err => {
-                    if (adminAlert) {
-                        adminAlert.className = 'alert alert-danger mb-4';
-                        adminAlert.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i> ${err.message}`;
-                    }
-                });
+        function getStatusBadge(statusLower) {
+            if (statusLower === 'pending')     return '<span class="badge bg-warning text-dark rounded-pill px-3 py-2">Pending</span>';
+            if (statusLower === 'in progress') return '<span class="badge bg-primary rounded-pill px-3 py-2">In Progress</span>';
+            if (statusLower === 'resolved')    return '<span class="badge bg-success rounded-pill px-3 py-2">Resolved</span>';
+            if (statusLower === 'rejected')    return '<span class="badge bg-danger rounded-pill px-3 py-2">Rejected</span>';
+            return '<span class="badge bg-secondary rounded-pill px-3 py-2">Unknown</span>';
         }
 
-        function loadStats() {
-            fetch('https://localhost:44392/api/GrievanceApi/count', {
+        function applyFilters() {
+            const searchVal = (document.getElementById('adminSearch')?.value || '').toLowerCase().trim();
+            const statusVal = (document.getElementById('adminStatusFilter')?.value || '').toLowerCase();
+
+            let visible = 0;
+            allAdminRows.forEach(({ tr, searchKey, statusLower }) => {
+                const matchSearch = !searchVal || searchKey.includes(searchVal);
+                const matchStatus = !statusVal || statusLower === statusVal;
+                const show = matchSearch && matchStatus;
+                tr.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            const entryEl = document.getElementById('adminEntryCount');
+            if (entryEl) {
+                entryEl.textContent = visible === allAdminRows.length
+                    ? `Showing all ${allAdminRows.length} entr${allAdminRows.length === 1 ? 'y' : 'ies'}`
+                    : `Showing ${visible} of ${allAdminRows.length} entr${allAdminRows.length === 1 ? 'y' : 'ies'}`;
+            }
+
+            // Empty-state row when nothing matches
+            const noMatchId = 'adminNoMatch';
+            const existing = document.getElementById(noMatchId);
+            if (visible === 0 && allAdminRows.length > 0) {
+                if (!existing) {
+                    const tr = document.createElement('tr');
+                    tr.id = noMatchId;
+                    tr.innerHTML = '<td colspan="6" class="text-center py-4 text-muted"><i class="fas fa-search me-2"></i>No results match your filter.</td>';
+                    tableBody.appendChild(tr);
+                }
+            } else if (existing) {
+                existing.remove();
+            }
+        }
+
+        function loadGrievances() {
+            const refreshBtn = document.getElementById('adminRefreshBtn');
+            if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...'; }
+
+            // Show skeleton loader
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;"><span class="visually-hidden">Loading...</span></div>
+                    <div class="text-muted mt-2 small">Fetching grievances...</div>
+                </td></tr>`;
+            }
+
+            fetch('https://localhost:44392/api/GrievanceApi', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(res => {
@@ -502,19 +473,115 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.location.href = 'index.html';
                     throw new Error('Unauthorized');
                 }
-                if (res.status === 403) {
-                    throw new Error('Access Denied: Admin required for stats.');
-                }
+                if (res.status === 403) throw new Error('Access Denied: You do not have Admin privileges.');
+                if (!res.ok) throw new Error('Failed to load grievances from the server.');
                 return res.json();
             })
-            .then(count => {
-                const totalEl = document.getElementById('totalCount');
-                if (totalEl) totalEl.textContent = count;
+            .then(data => {
+                if (!tableBody) return;
+                tableBody.innerHTML = '';
+                allAdminRows = [];
+
+                // ── Calculate stats ──────────────────────────────────────
+                let total = data.length;
+                let pending = 0, inProgress = 0, resolved = 0, rejected = 0;
+
+                if (total === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted"><i class="fas fa-inbox fa-2x mb-2 d-block"></i>No grievances found.</td></tr>';
+                    updateAdminStats(0, 0, 0, 0, 0);
+                    return;
+                }
+
+                data.forEach(item => {
+                    const statusLower = (item.status || 'pending').toLowerCase();
+                    if      (statusLower === 'pending')     pending++;
+                    else if (statusLower === 'in progress') inProgress++;
+                    else if (statusLower === 'resolved')    resolved++;
+                    else if (statusLower === 'rejected')    rejected++;
+
+                    const initials = (item.name || 'U').substring(0, 2).toUpperCase();
+                    const dateStr  = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+                    const ticketDisplay = item.ticketNumber || item.id || '?';
+
+                    const tr = document.createElement('tr');
+                    tr.style.transition = 'background 0.15s';
+                    tr.innerHTML = `
+                        <td class="ps-4 font-monospace fw-bold text-dark">#${ticketDisplay}</td>
+                        <td class="fw-medium">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-secondary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center me-2"
+                                    style="width:30px;height:30px;font-size:0.75rem;font-weight:bold;flex-shrink:0">${initials}</div>
+                                ${item.name || 'N/A'}
+                            </div>
+                        </td>
+                        <td><a href="mailto:${item.email}" class="text-decoration-none text-muted">${item.email || 'N/A'}</a></td>
+                        <td class="text-truncate" style="max-width:250px;" title="${item.subject || ''}">${item.subject || 'No Subject'}</td>
+                        <td class="text-center">${getStatusBadge(statusLower)}</td>
+                        <td class="pe-4 text-center">
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown">Action</button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-1">
+                                    <li><a class="dropdown-item fw-semibold py-2" href="#" onclick="updateTicketStatus('${item.id}','Pending');return false;"><i class="fas fa-hourglass-half text-warning me-2"></i>Set Pending</a></li>
+                                    <li><a class="dropdown-item fw-semibold py-2" href="#" onclick="updateTicketStatus('${item.id}','In Progress');return false;"><i class="fas fa-spinner text-primary me-2"></i>Set In Progress</a></li>
+                                    <li><a class="dropdown-item fw-semibold py-2" href="#" onclick="updateTicketStatus('${item.id}','Resolved');return false;"><i class="fas fa-check-circle text-success me-2"></i>Set Resolved</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item fw-semibold py-2 text-danger" href="#" onclick="updateTicketStatus('${item.id}','Rejected');return false;"><i class="fas fa-times-circle text-danger me-2"></i>Set Rejected</a></li>
+                                </ul>
+                            </div>
+                        </td>`;
+                    tableBody.appendChild(tr);
+
+                    // Store metadata for client-side filtering
+                    allAdminRows.push({
+                        tr,
+                        statusLower,
+                        searchKey: `${ticketDisplay} ${item.name || ''} ${item.email || ''} ${item.subject || ''}`.toLowerCase()
+                    });
+                });
+
+                updateAdminStats(total, pending, inProgress, resolved, rejected);
+                applyFilters(); // apply any active filter after reload
             })
-            .catch(console.error);
+            .catch(err => {
+                if (err.message === 'Unauthorized') return;
+                if (tableBody) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-5">
+                        <div class="alert alert-danger d-inline-block shadow-sm">
+                            <i class="fas fa-exclamation-triangle me-2"></i>${err.message}
+                        </div></td></tr>`;
+                }
+                if (adminAlert) {
+                    adminAlert.className = 'alert alert-danger mb-4';
+                    adminAlert.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i> ${err.message}`;
+                    adminAlert.classList.remove('d-none');
+                }
+            })
+            .finally(() => {
+                if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Refresh'; }
+            });
         }
 
-        loadStats();
+        function updateAdminStats(total, pending, inProgress, resolved, rejected) {
+            const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            set('totalCount',      total);
+            set('pendingCount',    pending);
+            set('inProgressCount', inProgress);
+            set('resolvedCount',   resolved);
+            set('rejectedCount',   rejected);
+
+            const entryEl = document.getElementById('adminEntryCount');
+            if (entryEl) entryEl.textContent = `Showing all ${total} entr${total === 1 ? 'y' : 'ies'}`;
+        }
+
+        // Wire up search & filter inputs
+        const searchInput  = document.getElementById('adminSearch');
+        const statusSelect = document.getElementById('adminStatusFilter');
+        if (searchInput)  searchInput.addEventListener('input',  applyFilters);
+        if (statusSelect) statusSelect.addEventListener('change', applyFilters);
+
+        // Expose for Refresh button and status-update reload
+        window.reloadAdminGrievances = loadGrievances;
+
         loadGrievances();
 
         window.updateTicketStatus = function (id, newStatus) {
@@ -526,36 +593,179 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify(newStatus)
             })
-                .then(res => {
-                    if (res.status === 401) {
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('role');
-                        window.location.href = 'index.html';
-                        throw new Error('Unauthorized');
-                    }
-                    if (res.status === 403) {
-                        throw new Error('Access Denied: Only Admins can modify statuses.');
-                    }
-                    if (!res.ok) throw new Error('Failed to update status on the server.');
-                    if (adminAlert) {
-                        adminAlert.className = 'alert alert-success mb-4 shadow-sm';
-                        adminAlert.style.animation = 'slideUp 0.3s ease-out';
-                        adminAlert.innerHTML = `<i class="fas fa-check-circle me-2 text-success"></i> Successfully updated ticket status to <strong>${newStatus}</strong>!`;
+            .then(res => {
+                if (res.status === 401) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('role');
+                    window.location.href = 'index.html';
+                    throw new Error('Unauthorized');
+                }
+                if (res.status === 403) throw new Error('Access Denied: Only Admins can modify statuses.');
+                if (!res.ok) throw new Error('Failed to update status on the server.');
 
-                        setTimeout(() => {
-                            adminAlert.classList.add('d-none');
-                        }, 4000);
-                    }
-                    loadGrievances(); // Refresh table
-                })
-                .catch(err => {
-                    if (adminAlert) {
-                        adminAlert.className = 'alert alert-danger mb-4 shadow-sm';
-                        adminAlert.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i> ${err.message}`;
-                        setTimeout(() => adminAlert.classList.add('d-none'), 5000);
-                    }
-                });
+                if (adminAlert) {
+                    adminAlert.className = 'alert alert-success mb-4 shadow-sm';
+                    adminAlert.style.animation = 'slideUp 0.3s ease-out';
+                    adminAlert.innerHTML = `<i class="fas fa-check-circle me-2 text-success"></i> Status updated to <strong>${newStatus}</strong> successfully!`;
+                    adminAlert.classList.remove('d-none');
+                    setTimeout(() => adminAlert.classList.add('d-none'), 4000);
+                }
+                loadGrievances();
+            })
+            .catch(err => {
+                if (err.message === 'Unauthorized') return;
+                if (adminAlert) {
+                    adminAlert.className = 'alert alert-danger mb-4 shadow-sm';
+                    adminAlert.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i> ${err.message}`;
+                    adminAlert.classList.remove('d-none');
+                    setTimeout(() => adminAlert.classList.add('d-none'), 5000);
+                }
+            });
         };
+    }
+
+    // My Grievances Page Logic
+    if (window.location.pathname.includes('my.html')) {
+        const myToken = localStorage.getItem('token');
+        const myEmail = localStorage.getItem('email') || '';
+
+        // Show user avatar / email in navbar
+        const avatar = document.getElementById('userAvatar');
+        const emailDisplay = document.getElementById('userEmailDisplay');
+        if (myEmail) {
+            const initials = myEmail.substring(0, 2).toUpperCase();
+            if (avatar) avatar.textContent = initials;
+            if (emailDisplay) {
+                emailDisplay.textContent = myEmail;
+                emailDisplay.classList.remove('d-none');
+            }
+        }
+
+        window.loadMyGrievances = function () {
+            const tableBody = document.getElementById('myGrievancesTableBody');
+            const alertEl = document.getElementById('myGrievancesAlert');
+            const refreshBtn = document.getElementById('refreshBtn');
+
+            // Show loading spinner
+            if (tableBody) {
+                tableBody.innerHTML = `
+                    <tr id="loadingRow">
+                        <td colspan="4" class="text-center" style="padding: 48px 0;">
+                            <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;"><span class="visually-hidden">Loading...</span></div>
+                            <div class="text-muted mt-2 small">Fetching your grievances...</div>
+                        </td>
+                    </tr>`;
+            }
+            if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing...'; }
+            if (alertEl) alertEl.classList.add('d-none');
+
+            fetch('https://localhost:44392/api/GrievanceApi', {
+                headers: { 'Authorization': `Bearer ${myToken}` }
+            })
+            .then(res => {
+                if (res.status === 401) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('role');
+                    window.location.href = 'index.html';
+                    throw new Error('Unauthorized');
+                }
+                if (!res.ok) throw new Error('Failed to load grievances. Please try again.');
+                return res.json();
+            })
+            .then(data => {
+                // Filter to only the logged-in user's grievances
+                const myData = myEmail
+                    ? data.filter(g => (g.email || '').toLowerCase() === myEmail.toLowerCase())
+                    : data;
+
+                if (!tableBody) return;
+                tableBody.innerHTML = '';
+
+                if (myData.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="4">
+                                <div class="text-center empty-state">
+                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                    <h5 class="fw-semibold text-muted">No grievances found</h5>
+                                    <p class="text-muted small mb-3">You haven't submitted any complaints yet.</p>
+                                    <a href="submit.html" class="btn btn-primary btn-sm px-4">
+                                        <i class="fas fa-plus me-1"></i> Submit Your First Grievance
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>`;
+                    updateMyStats(0, 0, 0, 0);
+                    return;
+                }
+
+                let pending = 0, inProgress = 0, resolved = 0;
+
+                myData.forEach(item => {
+                    const statusLower = (item.status || 'pending').toLowerCase();
+                    let statusBadge = '<span class="badge bg-secondary rounded-pill px-3 py-2 status-pill">Unknown</span>';
+                    if (statusLower === 'pending') {
+                        statusBadge = '<span class="badge bg-warning text-dark rounded-pill px-3 py-2 status-pill">Pending</span>';
+                        pending++;
+                    } else if (statusLower === 'in progress') {
+                        statusBadge = '<span class="badge bg-primary rounded-pill px-3 py-2 status-pill">In Progress</span>';
+                        inProgress++;
+                    } else if (statusLower === 'resolved') {
+                        statusBadge = '<span class="badge bg-success rounded-pill px-3 py-2 status-pill">Resolved</span>';
+                        resolved++;
+                    } else if (statusLower === 'rejected') {
+                        statusBadge = '<span class="badge bg-danger rounded-pill px-3 py-2 status-pill">Rejected</span>';
+                    }
+
+                    const dateStr = item.createdAt
+                        ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : 'N/A';
+
+                    const ticketDisplay = item.ticketNumber || ('#' + (item.id || '?'));
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'ticket-row fade-in';
+                    tr.innerHTML = `
+                        <td class="ps-4 font-monospace fw-bold text-dark">${ticketDisplay}</td>
+                        <td class="fw-medium text-truncate" style="max-width: 320px;" title="${item.subject || ''}">${item.subject || 'No Subject'}</td>
+                        <td>${statusBadge}</td>
+                        <td class="text-muted">${dateStr}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+
+                updateMyStats(myData.length, pending, inProgress, resolved);
+            })
+            .catch(err => {
+                if (err.message === 'Unauthorized') return;
+                if (tableBody) {
+                    tableBody.innerHTML = `
+                        <tr><td colspan="4" class="text-center py-5">
+                            <div class="alert alert-danger d-inline-block shadow-sm">
+                                <i class="fas fa-exclamation-triangle me-2"></i>${err.message}
+                            </div>
+                        </td></tr>`;
+                }
+                if (alertEl) {
+                    alertEl.className = 'alert alert-danger mb-4';
+                    alertEl.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>${err.message}`;
+                    alertEl.classList.remove('d-none');
+                }
+            })
+            .finally(() => {
+                if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Refresh'; }
+            });
+        };
+
+        function updateMyStats(total, pending, inProgress, resolved) {
+            const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            set('myTotal', total);
+            set('myPending', pending);
+            set('myInProgress', inProgress);
+            set('myResolved', resolved);
+        }
+
+        loadMyGrievances();
     }
 
     // Clear validation errors on input
@@ -575,5 +785,6 @@ document.addEventListener('DOMContentLoaded', () => {
 window.logout = function() {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
+    localStorage.removeItem("email");
     window.location.href = "index.html";
 };
