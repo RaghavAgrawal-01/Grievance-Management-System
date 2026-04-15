@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+    <script>
+        console.log("ADMIN PAGE LOADED");
+
+        setTimeout(() => {
+            console.log("ROLE:", localStorage.getItem("role"));
+            console.log("TOKEN:", localStorage.getItem("token"));
+        }, 1000);
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
@@ -8,14 +17,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body class="bg-light">
 
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container-fluid px-4">
             <a class="navbar-brand fw-bold d-flex align-items-center" href="#">
-                <i class="fas fa-shield-alt text-primary me-2"></i> GrievanceTrack 
-                <span class="badge bg-primary rounded-pill ms-2 ms-sm-3 align-text-bottom" style="font-size: 0.65rem;">ADMIN</span>
+                <i class="fas fa-shield-alt text-primary me-2"></i> GrievanceTrack
+                <span class="badge bg-primary rounded-pill ms-2 ms-sm-3 align-text-bottom"
+                    style="font-size: 0.65rem;">ADMIN</span>
             </a>
             <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -36,16 +47,20 @@
                     </li>
                 </ul>
                 <div class="d-flex align-items-center mt-3 mt-lg-0">
-                    <div class="bg-light text-dark fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
+                    <div class="bg-light text-dark fw-bold rounded-circle d-flex align-items-center justify-content-center"
+                        style="width: 35px; height: 35px;">
                         AD
                     </div>
-                    <a href="index.html" class="btn btn-sm btn-outline-danger ms-3 border-0 fw-semibold"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    <a href="#" onclick="logout(); return false;"
+                        class="btn btn-sm btn-outline-danger ms-3 border-0 fw-semibold"><i
+                            class="fas fa-sign-out-alt"></i> Logout</a>
                 </div>
             </div>
         </div>
     </nav>
 
     <main class="container-fluid px-4 py-5" style="max-width: 1400px;">
+        <div id="adminAlert" class="alert d-none mb-4" role="alert"></div>
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
             <h2 class="fw-bold m-0">Dashboard Overview</h2>
             <button class="btn btn-primary fw-bold shadow-sm px-4">
@@ -58,25 +73,27 @@
             <div class="col-sm-6 col-xl-3">
                 <div class="card shadow-sm border-0 rounded-4 h-100">
                     <div class="card-body d-flex align-items-center p-4">
-                        <div class="bg-primary bg-opacity-10 text-primary rounded-4 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 60px; height: 60px;">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-4 d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width: 60px; height: 60px;">
                             <i class="fas fa-ticket-alt fa-2x"></i>
                         </div>
                         <div class="ms-4">
-                            <h2 class="fw-bold mb-0">124</h2>
+                            <h2 id="totalCount" class="fw-bold mb-0">0</h2>
                             <p class="text-muted fw-medium mb-0 small text-uppercase tracking-wide">Total Grievances</p>
                         </div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-sm-6 col-xl-3">
                 <div class="card shadow-sm border-0 rounded-4 h-100">
                     <div class="card-body d-flex align-items-center p-4">
-                        <div class="bg-warning bg-opacity-10 text-warning rounded-4 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 60px; height: 60px;">
+                        <div class="bg-warning bg-opacity-10 text-warning rounded-4 d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width: 60px; height: 60px;">
                             <i class="fas fa-clock fa-2x"></i>
                         </div>
                         <div class="ms-4">
-                            <h2 class="fw-bold mb-0">32</h2>
+                            <h2 id="pendingCount" class="fw-bold mb-0">0</h2>
                             <p class="text-muted fw-medium mb-0 small text-uppercase tracking-wide">Pending Review</p>
                         </div>
                     </div>
@@ -86,11 +103,12 @@
             <div class="col-sm-6 col-xl-3">
                 <div class="card shadow-sm border-0 rounded-4 h-100">
                     <div class="card-body d-flex align-items-center p-4">
-                        <div class="bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 60px; height: 60px;">
+                        <div class="bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width: 60px; height: 60px;">
                             <i class="fas fa-check-circle fa-2x"></i>
                         </div>
                         <div class="ms-4">
-                            <h2 class="fw-bold mb-0">87</h2>
+                            <h2 id="resolvedCount" class="fw-bold mb-0">0</h2>
                             <p class="text-muted fw-medium mb-0 small text-uppercase tracking-wide">Resolved</p>
                         </div>
                     </div>
@@ -100,11 +118,12 @@
             <div class="col-sm-6 col-xl-3">
                 <div class="card shadow-sm border-0 rounded-4 h-100">
                     <div class="card-body d-flex align-items-center p-4">
-                        <div class="bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 60px; height: 60px;">
+                        <div class="bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width: 60px; height: 60px;">
                             <i class="fas fa-times-circle fa-2x"></i>
                         </div>
                         <div class="ms-4">
-                            <h2 class="fw-bold mb-0">5</h2>
+                            <h2 id="rejectedCount" class="fw-bold mb-0">0</h2>
                             <p class="text-muted fw-medium mb-0 small text-uppercase tracking-wide">Rejected</p>
                         </div>
                     </div>
@@ -113,7 +132,8 @@
         </div>
 
         <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
-            <div class="card-header bg-white border-bottom p-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+            <div
+                class="card-header bg-white border-bottom p-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
                 <h4 class="fw-bold m-0"><i class="fas fa-list text-primary me-2"></i> Recent Tickets</h4>
                 <div class="d-flex">
                     <select class="form-select bg-light w-auto fw-medium shadow-sm border-0">
@@ -124,89 +144,25 @@
                     </select>
                 </div>
             </div>
-            
+
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light text-muted small text-uppercase">
                         <tr>
                             <th class="ps-4 py-3">Ticket ID</th>
-                            <th class="py-3">User</th>
-                            <th class="py-3">Category</th>
+                            <th class="py-3">Name</th>
+                            <th class="py-3">Email</th>
                             <th class="py-3">Subject</th>
-                            <th class="py-3">Date</th>
-                            <th class="py-3">Status</th>
+                            <th class="py-3 text-center">Status</th>
                             <th class="py-3 pe-4 text-center">Action</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr>
-                            <td class="ps-4 font-monospace fw-bold text-dark">#TKT-5012</td>
-                            <td class="fw-medium">
-                                <div class="d-flex align-items-center">
-                                    <div class="bg-secondary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 30px; height: 30px; font-size: 0.75rem; font-weight: bold;">AS</div> 
-                                    Alice Smith
-                                </div>
-                            </td>
-                            <td>HR</td>
-                            <td class="text-truncate" style="max-width: 200px;">Leave approval pending</td>
-                            <td class="text-muted">Oct 24, 2023</td>
-                            <td><span class="badge bg-warning text-dark rounded-pill px-3 py-2 bg-opacity-75">Pending</span></td>
-                            <td class="pe-4 text-center">
-                                <button class="btn btn-sm btn-outline-primary fw-semibold rounded-3 px-3">Review</button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="ps-4 font-monospace fw-bold text-dark">#TKT-5009</td>
-                            <td class="fw-medium">
-                                <div class="d-flex align-items-center">
-                                    <div class="bg-secondary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 30px; height: 30px; font-size: 0.75rem; font-weight: bold;">BJ</div> 
-                                    Bob Johnson
-                                </div>
-                            </td>
-                            <td>IT</td>
-                            <td class="text-truncate" style="max-width: 200px;">Laptop screen flickering</td>
-                            <td class="text-muted">Oct 24, 2023</td>
-                            <td><span class="badge bg-primary rounded-pill px-3 py-2 bg-opacity-75">In Progress</span></td>
-                            <td class="pe-4 text-center">
-                                <button class="btn btn-sm btn-outline-primary fw-semibold rounded-3 px-3">Update</button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="ps-4 font-monospace fw-bold text-dark">#TKT-4991</td>
-                            <td class="fw-medium">
-                                <div class="d-flex align-items-center">
-                                    <div class="bg-secondary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 30px; height: 30px; font-size: 0.75rem; font-weight: bold;">CW</div> 
-                                    Carol White
-                                </div>
-                            </td>
-                            <td>Maintenance</td>
-                            <td class="text-truncate" style="max-width: 200px;">AC not working in Room 4A</td>
-                            <td class="text-muted">Oct 23, 2023</td>
-                            <td><span class="badge bg-success rounded-pill px-3 py-2 bg-opacity-75">Resolved</span></td>
-                            <td class="pe-4 text-center">
-                                <button class="btn btn-sm btn-light border fw-semibold rounded-3 px-3 text-secondary">View</button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="ps-4 font-monospace fw-bold text-dark">#TKT-4982</td>
-                            <td class="fw-medium">
-                                <div class="d-flex align-items-center">
-                                    <div class="bg-secondary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 30px; height: 30px; font-size: 0.75rem; font-weight: bold;">DB</div> 
-                                    David Brown
-                                </div>
-                            </td>
-                            <td>Finance</td>
-                            <td class="text-truncate" style="max-width: 200px;">Expense reimbursement delayed</td>
-                            <td class="text-muted">Oct 22, 2023</td>
-                            <td><span class="badge bg-danger rounded-pill px-3 py-2 bg-opacity-75">Rejected</span></td>
-                            <td class="pe-4 text-center">
-                                <button class="btn btn-sm btn-light border fw-semibold rounded-3 px-3 text-secondary">View</button>
-                            </td>
-                        </tr>
+                    <tbody id="adminTableBody">
+                        <!-- Data injected by app.js -->
                     </tbody>
                 </table>
             </div>
-            
+
             <div class="card-footer bg-white border-top p-3 d-flex justify-content-between align-items-center">
                 <span class="text-muted small">Showing 1 to 4 of 124 entries</span>
                 <nav aria-label="Page navigation">
@@ -219,11 +175,12 @@
                     </ul>
                 </nav>
             </div>
-            
+
         </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>
