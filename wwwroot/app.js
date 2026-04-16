@@ -6,10 +6,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (currentPage.includes("admin.html")) {
         console.log("Admin page - skipping global redirect");
     } else {
-        const isPublicPage = currentPage.includes("index.html") || currentPage.includes("register.html") || currentPage === "/" || currentPage === "";
+        const isPublicPage = currentPage.includes("index.html") || currentPage.includes("login.html") || currentPage.includes("register.html") || currentPage === "/" || currentPage === "";
 
         if (!isPublicPage && !token) {
-            window.location.href = "index.html";
+            window.location.href = "login.html";
             return;
         }
     }
@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const token = localStorage.getItem('token');
                     if (!token) {
-                        window.location.href = 'index.html';
+                        window.location.href = 'login.html';
                         return;
                     }
 
@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         .then(response => {
                             if (response.status === 401) {
                                 localStorage.removeItem('token');
-                                window.location.href = 'index.html';
+                                window.location.href = 'login.html';
                                 throw new Error('Unauthorized');
                             }
                             if (!response.ok) {
@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 registerAlert.classList.remove('d-none');
                             }
                             setTimeout(() => {
-                                window.location.href = 'index.html';
+                                window.location.href = 'login.html';
                             }, 2000);
                         })
                         .catch(error => {
@@ -333,7 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (response.status === 401) {
                                 localStorage.removeItem('token');
                                 localStorage.removeItem('role');
-                                window.location.href = 'index.html';
+                                window.location.href = 'login.html';
                                 throw new Error('Unauthorized');
                             }
                             if (response.status === 404) {
@@ -469,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.status === 401) {
                     localStorage.removeItem('token');
                     localStorage.removeItem('role');
-                    window.location.href = 'index.html';
+                    window.location.href = 'login.html';
                     throw new Error('Unauthorized');
                 }
                 if (res.status === 403) throw new Error('Access Denied: You do not have Admin privileges.');
@@ -599,7 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.status === 401) {
                     localStorage.removeItem('token');
                     localStorage.removeItem('role');
-                    window.location.href = 'index.html';
+                    window.location.href = 'login.html';
                     throw new Error('Unauthorized');
                 }
                 if (res.status === 403) throw new Error('Access Denied: Only Admins can modify statuses.');
@@ -668,7 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.status === 401) {
                     localStorage.removeItem('token');
                     localStorage.removeItem('role');
-                    window.location.href = 'index.html';
+                    window.location.href = 'login.html';
                     throw new Error('Unauthorized');
                 }
                 if (!res.ok) throw new Error('Failed to load your grievances. Please try again.');
@@ -773,7 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Admin/SuperAdmin guard
         if (!token || (role !== 'Admin' && role !== 'SuperAdmin')) {
-            window.location.href = 'index.html';
+            window.location.href = 'login.html';
         }
 
         const isSuperAdminUI = localStorage.getItem('isSuperAdmin') === 'true';
@@ -846,7 +846,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(res => {
-                if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'login.html'; throw new Error('Unauthorized'); }
                 if (res.status === 403) throw new Error('Access Denied: Admin privileges required.');
                 if (!res.ok) throw new Error('Failed to load users from the server.');
                 return res.json();
@@ -949,7 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(newRole)
             })
             .then(res => {
-                if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'login.html'; throw new Error('Unauthorized'); }
                 if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to change role.'); });
                 return res.json();
             })
@@ -982,7 +982,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
                 .then(res => {
-                    if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                    if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'login.html'; throw new Error('Unauthorized'); }
                     if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to delete user.'); });
                     return res.json();
                 })
@@ -1016,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Admin/SuperAdmin guard
         if (!token || (role !== 'Admin' && role !== 'SuperAdmin')) {
-            window.location.href = 'index.html';
+            window.location.href = 'login.html';
         }
 
         // Set year labels
@@ -1165,7 +1165,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(res => {
-                if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'login.html'; throw new Error('Unauthorized'); }
                 if (res.status === 403) throw new Error('Access Denied: Admin privileges required.');
                 if (!res.ok) throw new Error('Failed to load stats. Please try again.');
                 return res.json();
@@ -1194,7 +1194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const userEmail = localStorage.getItem('email') || '';
 
         // Auth guard
-        if (!token) { window.location.href = 'index.html'; }
+        if (!token) { window.location.href = 'login.html'; }
 
         // ── Navbar: show correct links per role ──────────────────────────────
         const adminLinks = document.getElementById('adminNavLinks');
@@ -1264,7 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ name, email })
                 })
                 .then(res => {
-                    if (res.status === 401) { localStorage.removeItem('token'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                    if (res.status === 401) { localStorage.removeItem('token'); window.location.href = 'login.html'; throw new Error('Unauthorized'); }
                     if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to update profile.'); });
                     return res.json();
                 })
@@ -1315,7 +1315,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ currentPassword: currentPwd, newPassword: newPwd })
                 })
                 .then(res => {
-                    if (res.status === 401) { localStorage.removeItem('token'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                    if (res.status === 401) { localStorage.removeItem('token'); window.location.href = 'login.html'; throw new Error('Unauthorized'); }
                     if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to change password.'); });
                     return res.json();
                 })
@@ -1327,7 +1327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (bar) { bar.style.width = '0%'; bar.style.backgroundColor = ''; }
                     if (lbl) lbl.textContent = '';
                     // Force re-login after password change
-                    setTimeout(() => { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('email'); localStorage.removeItem('name'); window.location.href = 'index.html'; }, 2500);
+                    setTimeout(() => { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('email'); localStorage.removeItem('name'); window.location.href = 'login.html'; }, 2500);
                 })
                 .catch(err => {
                     if (err.message === 'Unauthorized') return;
@@ -1396,5 +1396,5 @@ window.logout = function() {
     localStorage.removeItem("email");
     localStorage.removeItem("name");
     localStorage.removeItem("isSuperAdmin");
-    window.location.href = "index.html";
+    window.location.href = "login.html";
 };
