@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace GrievanceSystem.Models
 {
@@ -19,5 +19,7 @@ namespace GrievanceSystem.Models
 
         [Required]
         public string Role { get; set; } // User or Admin
+
+        public bool IsSuperAdmin { get; set; } = false;
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
@@ -28,5 +28,8 @@ namespace GrievanceSystem.Models
 
         // Current status of the grievance (e.g., Open, In Progress, Closed)
         public string? Status { get; set; }
+
+        // Path to the uploaded file (image/pdf)
+        public string? FilePath { get; set; }
     }
 }

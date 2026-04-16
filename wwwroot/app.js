@@ -97,9 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             localStorage.setItem('token', data.token);
                             localStorage.setItem('role', data.role);
                             localStorage.setItem('email', email);
+                            localStorage.setItem('isSuperAdmin', data.isSuperAdmin);
 
                             // Redirect based on role
-                            if (data.role === 'Admin') {
+                            if (data.role === 'Admin' || data.role === 'SuperAdmin') {
                                 window.location.href = 'admin.html';
                             } else {
                                 window.location.href = 'submit.html';
@@ -145,18 +146,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
 
+                    const formData = new FormData();
+                    formData.append('name', nameField.value);
+                    formData.append('email', emailField.value);
+                    formData.append('subject', subjectField.value);
+                    formData.append('description', descField.value);
+
+                    const fileInput = document.getElementById('grievanceFile');
+                    if (fileInput && fileInput.files[0]) {
+                        formData.append('file', fileInput.files[0]);
+                    }
+
                     fetch('https://localhost:44392/api/GrievanceApi', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
                             'Authorization': `Bearer ${token}`
                         },
-                        body: JSON.stringify({
-                            name: nameField.value,
-                            email: emailField.value,
-                            subject: subjectField.value,
-                            description: descField.value
-                        })
+                        body: formData
                     })
                         .then(response => {
                             if (response.status === 401) {
@@ -229,15 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const email = document.getElementById('email').value;
                     const pwd = document.getElementById('password').value;
                     const confirmPwd = document.getElementById('confirmPassword').value;
-                    const roleSelect = document.getElementById('role');
-                    let userRole = roleSelect ? roleSelect.value : 'User';
-
-                    // Explicitly format to backend requirements
-                    if (userRole === 'Administrator' || userRole === 'Admin') {
-                        userRole = 'Admin';
-                    } else {
-                        userRole = 'User';
-                    }
+                    const roleInput = document.getElementById('role');
+                    const userRole = roleInput ? roleInput.value : 'User';
 
                     const submitBtn = form.querySelector('button[type="submit"]');
                     const registerAlert = document.getElementById('registerAlert');
@@ -443,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!existing) {
                     const tr = document.createElement('tr');
                     tr.id = noMatchId;
-                    tr.innerHTML = '<td colspan="6" class="text-center py-4 text-muted"><i class="fas fa-search me-2"></i>No results match your filter.</td>';
+                    tr.innerHTML = '<td colspan="7" class="text-center py-4 text-muted"><i class="fas fa-search me-2"></i>No results match your filter.</td>';
                     tableBody.appendChild(tr);
                 }
             } else if (existing) {
@@ -457,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Show skeleton loader
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-5">
+                tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-5">
                     <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;"><span class="visually-hidden">Loading...</span></div>
                     <div class="text-muted mt-2 small">Fetching grievances...</div>
                 </td></tr>`;
@@ -487,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let pending = 0, inProgress = 0, resolved = 0, rejected = 0;
 
                 if (total === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted"><i class="fas fa-inbox fa-2x mb-2 d-block"></i>No grievances found.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-muted"><i class="fas fa-inbox fa-2x mb-2 d-block"></i>No grievances found.</td></tr>';
                     updateAdminStats(0, 0, 0, 0, 0);
                     return;
                 }
@@ -517,6 +516,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td><a href="mailto:${item.email}" class="text-decoration-none text-muted">${item.email || 'N/A'}</a></td>
                         <td class="text-truncate" style="max-width:250px;" title="${item.subject || ''}">${item.subject || 'No Subject'}</td>
                         <td class="text-center">${getStatusBadge(statusLower)}</td>
+                        <td class="text-center">
+                            ${item.filePath ? `<a href="${item.filePath}" target="_blank" class="btn btn-sm btn-light border shadow-sm fw-semibold"><i class="fas fa-paperclip me-1"></i>View</a>` : '<span class="text-muted small">—</span>'}
+                        </td>
                         <td class="pe-4 text-center">
                             <div class="dropdown">
                                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown">Action</button>
@@ -545,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => {
                 if (err.message === 'Unauthorized') return;
                 if (tableBody) {
-                    tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-5">
+                    tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-5">
                         <div class="alert alert-danger d-inline-block shadow-sm">
                             <i class="fas fa-exclamation-triangle me-2"></i>${err.message}
                         </div></td></tr>`;
@@ -659,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing...'; }
             if (alertEl) alertEl.classList.add('d-none');
 
-            fetch('https://localhost:44392/api/GrievanceApi', {
+            fetch('https://localhost:44392/api/GrievanceApi/my', {
                 headers: { 'Authorization': `Bearer ${myToken}` }
             })
             .then(res => {
@@ -669,14 +671,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.location.href = 'index.html';
                     throw new Error('Unauthorized');
                 }
-                if (!res.ok) throw new Error('Failed to load grievances. Please try again.');
+                if (!res.ok) throw new Error('Failed to load your grievances. Please try again.');
                 return res.json();
             })
-            .then(data => {
-                // Filter to only the logged-in user's grievances
-                const myData = myEmail
-                    ? data.filter(g => (g.email || '').toLowerCase() === myEmail.toLowerCase())
-                    : data;
+            .then(myData => {
 
                 if (!tableBody) return;
                 tableBody.innerHTML = '';
@@ -768,6 +766,580 @@ document.addEventListener('DOMContentLoaded', () => {
         loadMyGrievances();
     }
 
+    // ── Manage Users Page Logic ─────────────────────────────────────────────
+    if (window.location.pathname.includes('manage-users.html')) {
+        const token = localStorage.getItem('token');
+        const role  = localStorage.getItem('role');
+
+        // Admin/SuperAdmin guard
+        if (!token || (role !== 'Admin' && role !== 'SuperAdmin')) {
+            window.location.href = 'index.html';
+        }
+
+        const isSuperAdminUI = localStorage.getItem('isSuperAdmin') === 'true';
+
+        const tableBody   = document.getElementById('usersTableBody');
+        const alertEl     = document.getElementById('userAlert');
+        const refreshBtn  = document.getElementById('refreshUsersBtn');
+        const searchInput = document.getElementById('userSearch');
+
+        let allUserRows = []; // cache for client-side search
+        let pendingDeleteId = null; // for confirm modal
+
+        // Bootstrap modal instance
+        const confirmModalEl  = document.getElementById('confirmModal');
+        const confirmModal    = confirmModalEl ? new bootstrap.Modal(confirmModalEl) : null;
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+        function showAlert(msg, type = 'danger') {
+            if (!alertEl) return;
+            alertEl.className = `alert alert-${type} mb-4 shadow-sm`;
+            alertEl.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>${msg}`;
+            alertEl.classList.remove('d-none');
+            setTimeout(() => alertEl.classList.add('d-none'), 5000);
+        }
+
+        function getRoleBadge(role) {
+            if (role === 'SuperAdmin') return '<span class="role-badge role-badge-admin" style="background:#6610f2;color:#fff">Super Admin</span>';
+            return role === 'Admin'
+                ? '<span class="role-badge role-badge-admin">Admin</span>'
+                : '<span class="role-badge role-badge-user">User</span>';
+        }
+
+        function applyUserSearch() {
+            const q = (searchInput?.value || '').toLowerCase().trim();
+            let visible = 0;
+            allUserRows.forEach(({ tr, searchKey }) => {
+                const show = !q || searchKey.includes(q);
+                tr.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            const countEl = document.getElementById('userEntryCount');
+            if (countEl) {
+                countEl.textContent = visible === allUserRows.length
+                    ? `Showing all ${allUserRows.length} user${allUserRows.length !== 1 ? 's' : ''}`
+                    : `Showing ${visible} of ${allUserRows.length} user${allUserRows.length !== 1 ? 's' : ''}`;
+            }
+            const noMatch = document.getElementById('userNoMatch');
+            if (visible === 0 && allUserRows.length > 0) {
+                if (!noMatch) {
+                    const tr = document.createElement('tr');
+                    tr.id = 'userNoMatch';
+                    tr.innerHTML = '<td colspan="5" class="text-center py-4 text-muted"><i class="fas fa-search me-2"></i>No users match your search.</td>';
+                    tableBody.appendChild(tr);
+                }
+            } else if (noMatch) {
+                noMatch.remove();
+            }
+        }
+
+        window.loadUsers = function () {
+            if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...'; }
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;"><span class="visually-hidden">Loading...</span></div>
+                    <div class="text-muted mt-2 small">Fetching users...</div>
+                </td></tr>`;
+            }
+
+            fetch('https://localhost:44392/api/Auth/users', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => {
+                if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                if (res.status === 403) throw new Error('Access Denied: Admin privileges required.');
+                if (!res.ok) throw new Error('Failed to load users from the server.');
+                return res.json();
+            })
+            .then(data => {
+                if (!tableBody) return;
+                tableBody.innerHTML = '';
+                allUserRows = [];
+
+                // Stat counts
+                const totalAdmins = data.filter(u => u.role === 'Admin' || u.role === 'SuperAdmin').length;
+                const totalUsers  = data.filter(u => u.role === 'User').length;
+                const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+                set('statTotal',  data.length);
+                set('statAdmins', totalAdmins);
+                set('statUsers',  totalUsers);
+
+                if (data.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted"><i class="fas fa-users fa-2x d-block mb-2"></i>No registered users found.</td></tr>';
+                    const countEl = document.getElementById('userEntryCount');
+                    if (countEl) countEl.textContent = 'No users found';
+                    return;
+                }
+
+                data.forEach((user, index) => {
+                    const initials = (user.name || 'U').substring(0, 2).toUpperCase();
+                    const avatarColor = user.role === 'Admin' ? 'bg-primary bg-opacity-10 text-primary' : 'bg-secondary bg-opacity-25 text-secondary';
+                    const oppositeRole = user.role === 'Admin' ? 'User' : 'Admin';
+                    const changeRoleIcon = user.role === 'Admin' ? 'fa-user-minus' : 'fa-user-shield';
+                    const changeRoleLabel = user.role === 'Admin' ? 'Set as User' : 'Set as Admin';
+                    const changeRoleBtnClass = user.role === 'Admin' ? 'btn-outline-secondary' : 'btn-outline-primary';
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'user-row fade-in';
+                    
+                    // Conditionally show actions only if logged-in user is SuperAdmin
+                    // and don't allow actions on other SuperAdmins
+                    const showActions = isSuperAdminUI && !user.isSuperAdmin;
+
+                    tr.innerHTML = `
+                        <td class="ps-4 text-muted fw-semibold">${index + 1}</td>
+                        <td class="fw-medium">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-circle ${avatarColor} me-2">${initials}</div>
+                                <span>${user.name || 'N/A'}</span>
+                            </div>
+                        </td>
+                        <td><a href="mailto:${user.email}" class="text-decoration-none text-muted">${user.email || 'N/A'}</a></td>
+                        <td class="text-center" id="role-cell-${user.id}">${getRoleBadge(user.role)}</td>
+                        <td class="text-center pe-4">
+                            <div class="d-flex justify-content-center gap-2 ${showActions ? '' : 'd-none'}">
+                                <button class="btn btn-sm ${changeRoleBtnClass} fw-semibold shadow-sm"
+                                    id="role-btn-${user.id}"
+                                    onclick="window.changeUserRole(${user.id}, '${oppositeRole}')"
+                                    title="${changeRoleLabel}">
+                                    <i class="fas ${changeRoleIcon} me-1"></i>${changeRoleLabel}
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger fw-semibold shadow-sm"
+                                    onclick="window.confirmDeleteUser(${user.id}, '${(user.name || 'this user').replace(/'/g, "\\'")}')"
+                                    title="Delete user">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <span class="${showActions ? 'd-none' : 'text-muted small'}">${user.isSuperAdmin ? 'Protected' : 'No Access'}</span>
+                        </td>`;
+                    tableBody.appendChild(tr);
+
+                    allUserRows.push({
+                        tr,
+                        searchKey: `${user.name || ''} ${user.email || ''}`.toLowerCase()
+                    });
+                });
+
+                const countEl = document.getElementById('userEntryCount');
+                if (countEl) countEl.textContent = `Showing all ${data.length} user${data.length !== 1 ? 's' : ''}`;
+                if (searchInput && searchInput.value) applyUserSearch();
+            })
+            .catch(err => {
+                if (err.message === 'Unauthorized') return;
+                if (tableBody) {
+                    tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-5">
+                        <div class="alert alert-danger d-inline-block shadow-sm">
+                            <i class="fas fa-exclamation-triangle me-2"></i>${err.message}
+                        </div></td></tr>`;
+                }
+                showAlert(err.message);
+            })
+            .finally(() => {
+                if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Refresh'; }
+            });
+        };
+
+        window.changeUserRole = function (id, newRole) {
+            const btn = document.getElementById(`role-btn-${id}`);
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>'; }
+
+            fetch(`https://localhost:44392/api/Auth/change-role/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(newRole)
+            })
+            .then(res => {
+                if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to change role.'); });
+                return res.json();
+            })
+            .then(data => {
+                showAlert(`Role updated to <strong>${newRole}</strong> successfully!`, 'success');
+                loadUsers(); // full refresh to recalculate stats + badges
+            })
+            .catch(err => {
+                if (err.message === 'Unauthorized') return;
+                showAlert(err.message);
+                if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.label || 'Change Role'; }
+            });
+        };
+
+        window.confirmDeleteUser = function (id, name) {
+            pendingDeleteId = id;
+            const body = document.getElementById('confirmModalBody');
+            if (body) body.innerHTML = `Are you sure you want to delete <strong>${name}</strong>? This action <strong>cannot be undone</strong>.`;
+            if (confirmModal) confirmModal.show();
+        };
+
+        if (confirmDeleteBtn) {
+            confirmDeleteBtn.addEventListener('click', () => {
+                if (!pendingDeleteId) return;
+                confirmDeleteBtn.disabled = true;
+                confirmDeleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+
+                fetch(`https://localhost:44392/api/Auth/delete/${pendingDeleteId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                .then(res => {
+                    if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                    if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to delete user.'); });
+                    return res.json();
+                })
+                .then(() => {
+                    if (confirmModal) confirmModal.hide();
+                    showAlert('User deleted successfully.', 'success');
+                    loadUsers();
+                })
+                .catch(err => {
+                    if (err.message === 'Unauthorized') return;
+                    if (confirmModal) confirmModal.hide();
+                    showAlert(err.message);
+                })
+                .finally(() => {
+                    confirmDeleteBtn.disabled = false;
+                    confirmDeleteBtn.innerHTML = '<i class="fas fa-trash me-1"></i> Delete User';
+                    pendingDeleteId = null;
+                });
+            });
+        }
+
+        if (searchInput) searchInput.addEventListener('input', applyUserSearch);
+
+        loadUsers();
+    }
+
+    // ── Reports Page Logic ──────────────────────────────────────────────────
+    if (window.location.pathname.includes('reports.html')) {
+        const token = localStorage.getItem('token');
+        const role  = localStorage.getItem('role');
+
+        // Admin/SuperAdmin guard
+        if (!token || (role !== 'Admin' && role !== 'SuperAdmin')) {
+            window.location.href = 'index.html';
+        }
+
+        // Set year labels
+        const yr = new Date().getFullYear();
+        document.querySelectorAll('#currentYear, #barYear').forEach(el => { if (el) el.textContent = yr; });
+
+        const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        let pieChartInstance = null;
+        let barChartInstance = null;
+
+        const alertEl    = document.getElementById('reportsAlert');
+        const refreshBtn = document.getElementById('refreshReportsBtn');
+
+        function showAlert(msg, type = 'danger') {
+            if (!alertEl) return;
+            alertEl.className = `alert alert-${type} mb-4 shadow-sm`;
+            alertEl.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>${msg}`;
+            alertEl.classList.remove('d-none');
+            setTimeout(() => alertEl.classList.add('d-none'), 6000);
+        }
+
+        function setStatCards(data) {
+            const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            set('statTotal',      data.total);
+            set('statPending',    data.pending);
+            set('statInProgress', data.inProgress);
+            set('statResolved',   data.resolved);
+
+            // Resolution rate
+            const rate = data.total > 0 ? Math.round((data.resolved / data.total) * 100) : 0;
+            const rateEl = document.getElementById('resolutionRate');
+            const barEl  = document.getElementById('resolutionBar');
+            if (rateEl) rateEl.textContent = rate + '%';
+            if (barEl)  {
+                barEl.style.transition = 'width 1s ease';
+                setTimeout(() => { barEl.style.width = rate + '%'; barEl.setAttribute('aria-valuenow', rate); }, 100);
+            }
+        }
+
+        function buildPieChart(data) {
+            const spinner = document.getElementById('pieSpinner');
+            const wrapper = document.getElementById('pieWrapper');
+            const legend  = document.getElementById('pieLegend');
+            if (spinner) spinner.style.display = 'none';
+            if (wrapper) wrapper.style.display = 'block';
+            if (legend)  legend.classList.remove('d-none');
+
+            if (pieChartInstance) pieChartInstance.destroy();
+
+            const ctx = document.getElementById('pieChart').getContext('2d');
+            pieChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pending', 'In Progress', 'Resolved'],
+                    datasets: [{
+                        data: [data.pending, data.inProgress, data.resolved],
+                        backgroundColor: ['#ffc107', '#6610f2', '#198754'],
+                        borderColor: ['#fff', '#fff', '#fff'],
+                        borderWidth: 3,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                    const pct = total > 0 ? Math.round((ctx.raw / total) * 100) : 0;
+                                    return ` ${ctx.label}: ${ctx.raw} (${pct}%)`;
+                                }
+                            }
+                        }
+                    },
+                    animation: { animateScale: true, animateRotate: true, duration: 800 }
+                }
+            });
+        }
+
+        function buildBarChart(data) {
+            const spinner = document.getElementById('barSpinner');
+            const wrapper = document.getElementById('barWrapper');
+            if (spinner) spinner.style.display = 'none';
+            if (wrapper) wrapper.style.display = 'block';
+
+            if (barChartInstance) barChartInstance.destroy();
+
+            const ctx = document.getElementById('barChart').getContext('2d');
+
+            // Gradient fill
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(13,110,253,0.7)');
+            gradient.addColorStop(1, 'rgba(13,110,253,0.05)');
+
+            barChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: MONTHS,
+                    datasets: [{
+                        label: 'Complaints',
+                        data: data.monthlyData,
+                        backgroundColor: gradient,
+                        borderColor: '#0d6efd',
+                        borderWidth: 2,
+                        borderRadius: 6,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, precision: 0 },
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: ctx => `${ctx[0].label} ${yr}`,
+                                label: ctx => ` ${ctx.raw} complaint${ctx.raw !== 1 ? 's' : ''}`
+                            }
+                        }
+                    },
+                    animation: { duration: 900, easing: 'easeOutQuart' }
+                }
+            });
+        }
+
+        window.loadReports = function () {
+            if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...'; }
+
+            // Reset spinners
+            ['pieSpinner','barSpinner'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'block'; });
+            ['pieWrapper','barWrapper'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+            const legend = document.getElementById('pieLegend');
+            if (legend) legend.classList.add('d-none');
+
+            fetch('https://localhost:44392/api/GrievanceApi/stats', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => {
+                if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                if (res.status === 403) throw new Error('Access Denied: Admin privileges required.');
+                if (!res.ok) throw new Error('Failed to load stats. Please try again.');
+                return res.json();
+            })
+            .then(data => {
+                setStatCards(data);
+                buildPieChart(data);
+                buildBarChart(data);
+            })
+            .catch(err => {
+                if (err.message === 'Unauthorized') return;
+                showAlert(err.message);
+            })
+            .finally(() => {
+                if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Refresh'; }
+            });
+        };
+
+        loadReports();
+    }
+
+    // ── Settings Page Logic ─────────────────────────────────────────────────
+    if (window.location.pathname.includes('settings.html')) {
+        const token    = localStorage.getItem('token');
+        const userRole = localStorage.getItem('role');
+        const userEmail = localStorage.getItem('email') || '';
+
+        // Auth guard
+        if (!token) { window.location.href = 'index.html'; }
+
+        // ── Navbar: show correct links per role ──────────────────────────────
+        const adminLinks = document.getElementById('adminNavLinks');
+        const userLinks  = document.getElementById('userNavLinks');
+        const adminBadge = document.getElementById('roleAdminBadge');
+        const navbar     = document.getElementById('settingsNavbar');
+
+        if (userRole === 'Admin' || userRole === 'SuperAdmin') {
+            if (adminLinks) adminLinks.style.removeProperty('display');
+            if (adminBadge) {
+                adminBadge.textContent = userRole === 'SuperAdmin' ? 'Super Admin' : 'Admin';
+                adminBadge.classList.remove('d-none');
+            }
+        } else {
+            if (userLinks) userLinks.style.removeProperty('display');
+            if (navbar) navbar.style.background = '#0d6efd';
+        }
+
+        // ── Pre-fill navbar avatar + email ───────────────────────────────────
+        const navAvatar = document.getElementById('navAvatar');
+        const navEmailEl = document.getElementById('navEmail');
+        if (userEmail) {
+            const initials = userEmail.substring(0, 2).toUpperCase();
+            if (navAvatar) navAvatar.textContent = initials;
+            if (navEmailEl) { navEmailEl.textContent = userEmail; navEmailEl.classList.remove('d-none'); }
+        }
+
+        // ── Pre-fill page header & form ──────────────────────────────────────
+        const savedName  = localStorage.getItem('name') || '';
+        const headerName = document.getElementById('headerName');
+        const headerEmail = document.getElementById('headerEmail');
+        const headerAvatar = document.getElementById('headerAvatar');
+        const profileNameInput  = document.getElementById('profileName');
+        const profileEmailInput = document.getElementById('profileEmail');
+
+        if (headerName)  headerName.textContent  = savedName  || 'Account Settings';
+        if (headerEmail) headerEmail.textContent  = userEmail  || '';
+        if (headerAvatar) headerAvatar.textContent = (savedName || userEmail || '?').substring(0, 2).toUpperCase();
+        if (profileNameInput)  profileNameInput.value  = savedName;
+        if (profileEmailInput) profileEmailInput.value = userEmail;
+
+        const alertEl = document.getElementById('settingsAlert');
+        function showSettingsAlert(msg, type = 'danger') {
+            if (!alertEl) return;
+            alertEl.className = `alert alert-${type} mb-4 shadow-sm`;
+            alertEl.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>${msg}`;
+            alertEl.classList.remove('d-none');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => alertEl.classList.add('d-none'), 6000);
+        }
+
+        // ── Update Profile form ──────────────────────────────────────────────
+        const profileForm = document.getElementById('profileForm');
+        if (profileForm) {
+            profileForm.addEventListener('submit', e => {
+                e.preventDefault();
+                const name  = profileNameInput?.value.trim();
+                const email = profileEmailInput?.value.trim();
+                if (!name && !email) return;
+
+                const btn = document.getElementById('profileSubmitBtn');
+                if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...'; }
+
+                fetch('https://localhost:44392/api/Auth/update-profile', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ name, email })
+                })
+                .then(res => {
+                    if (res.status === 401) { localStorage.removeItem('token'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                    if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to update profile.'); });
+                    return res.json();
+                })
+                .then(data => {
+                    // Sync localStorage
+                    if (data.name)  { localStorage.setItem('name', data.name); if (headerName) headerName.textContent = data.name; if (headerAvatar) headerAvatar.textContent = data.name.substring(0,2).toUpperCase(); }
+                    if (data.email) { localStorage.setItem('email', data.email); if (headerEmail) headerEmail.textContent = data.email; if (navEmailEl) navEmailEl.textContent = data.email; }
+                    showSettingsAlert('Profile updated successfully!', 'success');
+                })
+                .catch(err => {
+                    if (err.message === 'Unauthorized') return;
+                    showSettingsAlert(err.message);
+                })
+                .finally(() => {
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save me-1"></i> Save Changes'; }
+                });
+            });
+        }
+
+        // ── Change Password form ─────────────────────────────────────────────
+        const passwordForm = document.getElementById('passwordForm');
+        if (passwordForm) {
+            passwordForm.addEventListener('submit', e => {
+                e.preventDefault();
+                const currentPwd = document.getElementById('currentPassword')?.value;
+                const newPwd     = document.getElementById('newPassword')?.value;
+                const confirmPwd = document.getElementById('confirmNewPassword')?.value;
+
+                if (!currentPwd || !newPwd || !confirmPwd) {
+                    showSettingsAlert('Please fill in all password fields.');
+                    return;
+                }
+                if (newPwd.length < 6) {
+                    showSettingsAlert('New password must be at least 6 characters.');
+                    return;
+                }
+                if (newPwd !== confirmPwd) {
+                    showSettingsAlert('New passwords do not match.');
+                    return;
+                }
+
+                const btn = document.getElementById('pwdSubmitBtn');
+                if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...'; }
+
+                fetch('https://localhost:44392/api/Auth/change-password', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ currentPassword: currentPwd, newPassword: newPwd })
+                })
+                .then(res => {
+                    if (res.status === 401) { localStorage.removeItem('token'); window.location.href = 'index.html'; throw new Error('Unauthorized'); }
+                    if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to change password.'); });
+                    return res.json();
+                })
+                .then(() => {
+                    showSettingsAlert('Password changed successfully! Please log in again.', 'success');
+                    passwordForm.reset();
+                    const bar = document.getElementById('pwdStrengthBar');
+                    const lbl = document.getElementById('pwdStrengthLabel');
+                    if (bar) { bar.style.width = '0%'; bar.style.backgroundColor = ''; }
+                    if (lbl) lbl.textContent = '';
+                    // Force re-login after password change
+                    setTimeout(() => { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('email'); localStorage.removeItem('name'); window.location.href = 'index.html'; }, 2500);
+                })
+                .catch(err => {
+                    if (err.message === 'Unauthorized') return;
+                    showSettingsAlert(err.message);
+                })
+                .finally(() => {
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-shield-alt me-1"></i> Update Password'; }
+                });
+            });
+        }
+    }
+
     // Clear validation errors on input
     const formElements = document.querySelectorAll('form');
     formElements.forEach(form => {
@@ -782,9 +1354,47 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// ── Password visibility toggle ─────────────────────────────────────────────
+window.togglePwd = function(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const isText = input.type === 'text';
+    input.type = isText ? 'password' : 'text';
+    const icon = btn.querySelector('i');
+    if (icon) { icon.className = isText ? 'fas fa-eye' : 'fas fa-eye-slash'; }
+};
+
+// ── Password strength meter ─────────────────────────────────────────────────
+window.updateStrength = function(pwd) {
+    const bar = document.getElementById('pwdStrengthBar');
+    const lbl = document.getElementById('pwdStrengthLabel');
+    if (!bar || !lbl) return;
+    let score = 0;
+    if (pwd.length >= 6)  score++;
+    if (pwd.length >= 10) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    const levels = [
+        { pct: '0%',   color: '#e9ecef', label: '' },
+        { pct: '25%',  color: '#dc3545', label: 'Weak' },
+        { pct: '50%',  color: '#fd7e14', label: 'Fair' },
+        { pct: '75%',  color: '#ffc107', label: 'Good' },
+        { pct: '90%',  color: '#198754', label: 'Strong' },
+        { pct: '100%', color: '#0d6efd', label: 'Very Strong' },
+    ];
+    const level = levels[Math.min(score, 5)];
+    bar.style.width = level.pct;
+    bar.style.backgroundColor = level.color;
+    lbl.textContent = level.label;
+    lbl.style.color = level.color;
+};
+
 window.logout = function() {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     localStorage.removeItem("email");
+    localStorage.removeItem("name");
+    localStorage.removeItem("isSuperAdmin");
     window.location.href = "index.html";
 };

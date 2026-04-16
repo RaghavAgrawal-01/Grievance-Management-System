@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports - GrievanceTrack Admin</title>
+    <meta name="description" content="Visual analytics and reports for all grievance data.">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .stat-card {
+            border-left: 4px solid transparent;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1) !important; }
+        .stat-card.total      { border-left-color: #0d6efd; }
+        .stat-card.pending    { border-left-color: #ffc107; }
+        .stat-card.progress   { border-left-color: #6610f2; }
+        .stat-card.resolved   { border-left-color: #198754; }
+
+        .chart-card {
+            border: none;
+            border-radius: 1rem;
+            transition: box-shadow 0.2s;
+        }
+        .chart-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.09) !important; }
+
+        .chart-container { position: relative; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.4s ease-out both; }
+
+        .legend-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="#">
+                <i class="fas fa-shield-alt text-primary me-2"></i> GrievanceTrack
+                <span class="badge bg-primary rounded-pill ms-2" style="font-size:0.65rem;">ADMIN</span>
+            </a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
+                    <li class="nav-item">
+                        <a class="nav-link" href="admin.html">
+                            <i class="fas fa-tachometer-alt me-1"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="manage-users.html">
+                            <i class="fas fa-users me-1"></i> Manage Users
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active fw-semibold" href="reports.html">
+                            <i class="fas fa-chart-bar me-1"></i> Reports
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="settings.html">
+                            <i class="fas fa-cog me-1"></i> Settings
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center mt-3 mt-lg-0">
+                    <div class="bg-light text-dark fw-bold rounded-circle d-flex align-items-center justify-content-center"
+                        style="width:35px;height:35px;font-size:0.8rem;">AD</div>
+                    <a href="#" onclick="logout(); return false;"
+                        class="btn btn-sm btn-outline-danger ms-3 border-0 fw-semibold">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-fluid px-4 py-5" style="max-width:1300px;">
+
+        <!-- Alert -->
+        <div id="reportsAlert" class="alert d-none mb-4" role="alert"></div>
+
+        <!-- Page Header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 fade-up">
+            <div>
+                <h1 class="fw-bold fs-3 mb-1">
+                    <i class="fas fa-chart-pie text-primary me-2"></i> Reports & Analytics
+                </h1>
+                <p class="text-muted mb-0 small">Visual breakdown of all grievance data for <span id="currentYear"></span>.</p>
+            </div>
+            <button id="refreshReportsBtn" class="btn btn-outline-secondary shadow-sm fw-medium mt-3 mt-md-0"
+                onclick="loadReports()">
+                <i class="fas fa-sync-alt me-1"></i> Refresh
+            </button>
+        </div>
+
+        <!-- ── Stat Cards ─────────────────────────────────────────────────── -->
+        <div class="row g-3 mb-4 fade-up">
+
+            <div class="col-6 col-xl-3">
+                <div class="card shadow-sm border-0 rounded-4 h-100 stat-card total">
+                    <div class="card-body d-flex align-items-center p-4">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-4 d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width:56px;height:56px;">
+                            <i class="fas fa-ticket-alt fa-xl"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h2 id="statTotal" class="fw-bold mb-0">—</h2>
+                            <p class="text-muted small text-uppercase fw-semibold mb-0">Total</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-xl-3">
+                <div class="card shadow-sm border-0 rounded-4 h-100 stat-card pending">
+                    <div class="card-body d-flex align-items-center p-4">
+                        <div class="bg-warning bg-opacity-10 text-warning rounded-4 d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width:56px;height:56px;">
+                            <i class="fas fa-hourglass-half fa-xl"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h2 id="statPending" class="fw-bold mb-0">—</h2>
+                            <p class="text-muted small text-uppercase fw-semibold mb-0">Pending</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-xl-3">
+                <div class="card shadow-sm border-0 rounded-4 h-100 stat-card progress">
+                    <div class="card-body d-flex align-items-center p-4">
+                        <div class="rounded-4 d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width:56px;height:56px;background:rgba(102,16,242,0.1);color:#6610f2;">
+                            <i class="fas fa-spinner fa-xl"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h2 id="statInProgress" class="fw-bold mb-0">—</h2>
+                            <p class="text-muted small text-uppercase fw-semibold mb-0">In Progress</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-xl-3">
+                <div class="card shadow-sm border-0 rounded-4 h-100 stat-card resolved">
+                    <div class="card-body d-flex align-items-center p-4">
+                        <div class="bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width:56px;height:56px;">
+                            <i class="fas fa-check-circle fa-xl"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h2 id="statResolved" class="fw-bold mb-0">—</h2>
+                            <p class="text-muted small text-uppercase fw-semibold mb-0">Resolved</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ── Charts Row ─────────────────────────────────────────────────── -->
+        <div class="row g-4 fade-up">
+
+            <!-- Pie Chart -->
+            <div class="col-lg-5">
+                <div class="card chart-card shadow-sm h-100">
+                    <div class="card-header bg-white border-bottom py-3 px-4">
+                        <h5 class="fw-bold m-0">
+                            <i class="fas fa-chart-pie text-primary me-2"></i> Status Breakdown
+                        </h5>
+                        <p class="text-muted small mb-0 mt-1">Distribution of grievance statuses</p>
+                    </div>
+                    <div class="card-body d-flex flex-column align-items-center justify-content-center p-4">
+                        <!-- Spinner shown until chart data arrives -->
+                        <div id="pieSpinner" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="text-muted mt-2 small">Loading chart...</div>
+                        </div>
+                        <div class="chart-container w-100" style="max-width:300px; display:none;" id="pieWrapper">
+                            <canvas id="pieChart"></canvas>
+                        </div>
+                        <!-- Custom legend -->
+                        <div id="pieLegend" class="mt-4 d-none">
+                            <div class="d-flex flex-wrap justify-content-center gap-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="legend-dot" style="background:#ffc107;"></span>
+                                    <span class="small fw-medium">Pending</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="legend-dot" style="background:#6610f2;"></span>
+                                    <span class="small fw-medium">In Progress</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="legend-dot" style="background:#198754;"></span>
+                                    <span class="small fw-medium">Resolved</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bar Chart -->
+            <div class="col-lg-7">
+                <div class="card chart-card shadow-sm h-100">
+                    <div class="card-header bg-white border-bottom py-3 px-4">
+                        <h5 class="fw-bold m-0">
+                            <i class="fas fa-chart-bar text-primary me-2"></i> Monthly Complaints
+                        </h5>
+                        <p class="text-muted small mb-0 mt-1">Complaints submitted per month in <span id="barYear"></span></p>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column justify-content-center">
+                        <div id="barSpinner" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="text-muted mt-2 small">Loading chart...</div>
+                        </div>
+                        <div class="chart-container" style="display:none;" id="barWrapper">
+                            <canvas id="barChart" height="220"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ── Resolution Rate Card ───────────────────────────────────────── -->
+        <div class="row g-4 mt-0 fade-up">
+            <div class="col-12">
+                <div class="card chart-card shadow-sm">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                            <div>
+                                <h5 class="fw-bold mb-1">
+                                    <i class="fas fa-bullseye text-success me-2"></i> Resolution Rate
+                                </h5>
+                                <p class="text-muted small mb-0">Percentage of all complained resolved so far.</p>
+                            </div>
+                            <h2 id="resolutionRate" class="fw-bold text-success mb-0">—</h2>
+                        </div>
+                        <div class="progress mt-3 rounded-pill" style="height:10px;">
+                            <div id="resolutionBar" class="progress-bar bg-success rounded-pill"
+                                role="progressbar" style="width:0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

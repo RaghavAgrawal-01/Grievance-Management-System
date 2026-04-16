@@ -1,8 +1,10 @@
-﻿using GrievanceSystem.Data;
+using GrievanceSystem.Data;
 using GrievanceSystem.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
+using System.Security.Claims;
 
 namespace GrievanceSystem.Controllers
 {
@@ -12,17 +14,19 @@ namespace GrievanceSystem.Controllers
     public class GrievanceApiController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _environment;
 
-        public GrievanceApiController(AppDbContext context)
+        public GrievanceApiController(AppDbContext context, IWebHostEnvironment environment)
         {
             _context = context;
+            _environment = environment;
         }
 
         // =======================
         // GET ALL COMPLAINTS (Admin Only)
         // =======================
         [HttpGet]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<ActionResult<IEnumerable<Grievance>>> GetAll()
         {
             return await _context.Grievances.ToListAsync();
@@ -42,16 +46,31 @@ namespace GrievanceSystem.Controllers
             return Ok(grievance);
         }
 
-        // =======================
         // CREATE COMPLAINT (User)
         // =======================
         [HttpPost]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Grievance>> Create([FromBody] Grievance grievance)
+        public async Task<ActionResult<Grievance>> Create([FromForm] Grievance grievance, IFormFile? file)
         {
             grievance.TicketNumber = "GRV" + DateTime.Now.Ticks.ToString().Substring(10);
             grievance.Status = "Pending";
             grievance.CreatedAt = DateTime.Now;
+
+            if (file != null && file.Length > 0)
+            {
+                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads");
+                if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+                var filePath = Path.Combine(uploadsFolder, fileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                grievance.FilePath = "/uploads/" + fileName;
+            }
 
             _context.Grievances.Add(grievance);
             await _context.SaveChangesAsync();
@@ -63,7 +82,7 @@ namespace GrievanceSystem.Controllers
         // UPDATE STATUS (Admin Only)
         // =======================
         [HttpPut("update-status/{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] string status)
         {
             var grievance = await _context.Grievances.FindAsync(id);
@@ -81,7 +100,7 @@ namespace GrievanceSystem.Controllers
         // DELETE (Admin Only)
         // =======================
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> Delete(int id)
         {
             var grievance = await _context.Grievances.FindAsync(id);
@@ -114,11 +133,59 @@ namespace GrievanceSystem.Controllers
         // COUNT (Dashboard)
         // =======================
         [HttpGet("count")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public IActionResult GetTotalCount()
         {
             var count = _context.Grievances.Count();
             return Ok(count);
+        }
+
+        // =======================
+        // STATS (Reports page)
+        // =======================
+        [HttpGet("stats")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
+        public async Task<IActionResult> GetStats()
+        {
+            var all = await _context.Grievances.ToListAsync();
+
+            var total      = all.Count;
+            var pending    = all.Count(g => (g.Status ?? "").ToLower() == "pending");
+            var inProgress = all.Count(g => (g.Status ?? "").ToLower() == "in progress");
+            var resolved   = all.Count(g => (g.Status ?? "").ToLower() == "resolved");
+
+            // Monthly breakdown for the current year (12 months)
+            int year = DateTime.Now.Year;
+            var monthlyData = Enumerable.Range(1, 12)
+                .Select(m => all.Count(g => g.CreatedAt.Year == year && g.CreatedAt.Month == m))
+                .ToList();
+
+            return Ok(new
+            {
+                total,
+                pending,
+                inProgress,
+                resolved,
+                monthlyData
+            });
+        }
+
+        // =======================
+        // GET MY GRIEVANCES (User)
+        // =======================
+        [HttpGet("my")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<Grievance>>> GetMyGrievances()
+        {
+            var email = User.FindFirstValue(ClaimTypes.Email);
+            if (string.IsNullOrEmpty(email)) return Unauthorized();
+
+            var grievances = await _context.Grievances
+                .Where(g => g.Email.ToLower() == email.ToLower())
+                .OrderByDescending(g => g.CreatedAt)
+                .ToListAsync();
+
+            return Ok(grievances);
         }
     }
 }

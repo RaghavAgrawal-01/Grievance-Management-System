@@ -2,7 +2,6 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
@@ -27,22 +26,30 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
                     <li class="nav-item">
-                        <a class="nav-link active fw-semibold" href="admin.html">Dashboard</a>
+                        <a class="nav-link active fw-semibold" href="admin.html">
+                            <i class="fas fa-tachometer-alt me-1"></i> Dashboard
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">Manage Users</a>
+                        <a class="nav-link" href="manage-users.html">
+                            <i class="fas fa-users me-1"></i> Manage Users
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">Reports</a>
+                        <a class="nav-link" href="reports.html">
+                            <i class="fas fa-chart-bar me-1"></i> Reports
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">Settings</a>
+                        <a class="nav-link" href="settings.html">
+                            <i class="fas fa-cog me-1"></i> Settings
+                        </a>
                     </li>
                 </ul>
                 <div class="d-flex align-items-center mt-3 mt-lg-0">
                     <div class="bg-light text-dark fw-bold rounded-circle d-flex align-items-center justify-content-center"
                         style="width: 35px; height: 35px;">
-                        AD
+                        RA
                     </div>
                     <a href="#" onclick="logout(); return false;"
                         class="btn btn-sm btn-outline-danger ms-3 border-0 fw-semibold"><i
@@ -137,11 +144,14 @@
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <!-- Live search -->
                     <div class="input-group shadow-sm" style="min-width: 220px;">
-                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                        <input id="adminSearch" type="text" class="form-control border-start-0 ps-1" placeholder="Search ticket, name, email…">
+                        <span class="input-group-text bg-white border-end-0"><i
+                                class="fas fa-search text-muted"></i></span>
+                        <input id="adminSearch" type="text" class="form-control border-start-0 ps-1"
+                            placeholder="Search ticket, name, email…">
                     </div>
                     <!-- Status filter -->
-                    <select id="adminStatusFilter" class="form-select bg-light fw-medium shadow-sm border-0" style="width: auto;">
+                    <select id="adminStatusFilter" class="form-select bg-light fw-medium shadow-sm border-0"
+                        style="width: auto;">
                         <option value="">All Status</option>
                         <option value="pending">Pending</option>
                         <option value="in progress">In Progress</option>
@@ -149,7 +159,8 @@
                         <option value="rejected">Rejected</option>
                     </select>
                     <!-- Refresh -->
-                    <button id="adminRefreshBtn" class="btn btn-outline-secondary shadow-sm fw-medium" onclick="window.reloadAdminGrievances && window.reloadAdminGrievances()">
+                    <button id="adminRefreshBtn" class="btn btn-outline-secondary shadow-sm fw-medium"
+                        onclick="window.reloadAdminGrievances && window.reloadAdminGrievances()">
                         <i class="fas fa-sync-alt me-1"></i> Refresh
                     </button>
                 </div>
@@ -164,6 +175,7 @@
                             <th class="py-3">Email</th>
                             <th class="py-3">Subject</th>
                             <th class="py-3 text-center">Status</th>
+                            <th class="py-3 text-center">Attachment</th>
                             <th class="py-3 pe-4 text-center">Action</th>
                         </tr>
                     </thead>

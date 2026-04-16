@@ -79,12 +79,14 @@
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label fw-semibold">Attachments (Optional)</label>
-                                <div class="border border-2 border-dashed rounded-3 p-5 text-center bg-light upload-area-bs">
-                                    <i class="fas fa-cloud-upload-alt fa-3x text-secondary mb-3"></i>
-                                    <h5>Click to upload or drag and drop</h5>
-                                    <p class="text-muted small mb-0">SVG, PNG, JPG or PDF (max. 5MB)</p>
+                                <label for="grievanceFile" class="form-label fw-semibold">Attachments (Optional)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">
+                                        <i class="fas fa-paperclip text-muted"></i>
+                                    </span>
+                                    <input type="file" id="grievanceFile" class="form-control bg-light border-start-0" accept="image/*,.pdf">
                                 </div>
+                                <div class="form-text text-muted small">SVG, PNG, JPG or PDF (max. 5MB)</div>
                             </div>
 
                             <div class="d-flex justify-content-end gap-2 mt-5 pt-3 border-top">
