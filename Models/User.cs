@@ -18,7 +18,7 @@ namespace GrievanceSystem.Models
         public string Password { get; set; }
 
         [Required]
-        public string Role { get; set; } // User or Admin
+        public string Role { get; set; } // User, Admin, or SuperAdmin
 
         public bool IsSuperAdmin { get; set; } = false;
     }

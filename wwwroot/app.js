@@ -12,6 +12,50 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = "login.html";
             return;
         }
+
+    // Extract initials from full name
+    function getInitials(name) {
+        if (!name) return '';
+        const parts = name.trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return '';
+        if (parts.length === 1) {
+            return parts[0].substring(0, 2).toUpperCase();
+        }
+        const first = parts[0][0] || '';
+        const last  = parts[parts.length - 1][0] || '';
+        return (first + last).toUpperCase();
+    }
+
+    // Render avatar initials into any element with class 'avatar' or id 'userAvatar'
+    function renderAvatar() {
+        const name = localStorage.getItem('name') || localStorage.getItem('email') || '';
+        const initials = getInitials(name) || '?';
+        // elements using class 'avatar'
+        document.querySelectorAll('.avatar').forEach(el => {
+            el.textContent = initials;
+        });
+        const ua = document.getElementById('userAvatar');
+        if (ua) ua.textContent = initials;
+    }
+    }
+
+    // Render avatar on load
+    try { renderAvatar(); } catch (e) { }
+
+    // Role-based navigation for navbar brand
+    const navbarBrand = document.querySelector('.navbar-brand');
+    if (navbarBrand) {
+        navbarBrand.addEventListener('click', (e) => {
+            e.preventDefault();
+            const role = localStorage.getItem("role");
+            if (role === "Admin" || role === "SuperAdmin") {
+                window.location.href = "admin.html";
+            } else if (role === "User") {
+                window.location.href = "submit.html";
+            } else {
+                window.location.href = "index.html";
+            }
+        });
     }
 
     // Basic form validation for any form with class 'needs-validation'
@@ -60,6 +104,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
+    // Export report button (admin page) - id = exportBtn
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Unauthorized. Please login.');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Exporting...';
+
+            try {
+                const resp = await fetch('https://localhost:44392/api/GrievanceApi/export', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (resp.status === 401) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('role');
+                    alert('You are not authorized to perform this action.');
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                if (!resp.ok) {
+                    const txt = await resp.text();
+                    throw new Error(txt || 'Failed to export report');
+                }
+
+                const blob = await resp.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'grievances.csv';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } catch (err) {
+                alert(err.message || 'Export failed');
+            } finally {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = 'Export Report';
+            }
+        });
+    }
+
             if (!isValid) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -96,8 +193,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             // Save token, role and email
                             localStorage.setItem('token', data.token);
                             localStorage.setItem('role', data.role);
+                            localStorage.setItem('name', data.name || '');
                             localStorage.setItem('email', email);
                             localStorage.setItem('isSuperAdmin', data.isSuperAdmin);
+
+                            // render avatar immediately
+                            try { renderAvatar(); } catch (e) { }
 
                             // Redirect based on role
                             if (data.role === 'Admin' || data.role === 'SuperAdmin') {
@@ -882,9 +983,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     const tr = document.createElement('tr');
                     tr.className = 'user-row fade-in';
                     
-                    // Conditionally show actions only if logged-in user is SuperAdmin
-                    // and don't allow actions on other SuperAdmins
-                    const showActions = isSuperAdminUI && !user.isSuperAdmin;
+                    // RBAC UI Logic:
+                    // 1. SuperAdmin can manage anyone except (other) SuperAdmins
+                    // 2. Admin can only manage 'User' role accounts
+                    const loggedInRole = localStorage.getItem('role');
+                    const isTargetSuperAdmin = user.isSuperAdmin || user.role === 'SuperAdmin';
+                    const isTargetAdmin = user.role === 'Admin';
+                    const isTargetUser = user.role === "User";
+
+                    let showActions = false;
+                    if (loggedInRole === 'SuperAdmin' && !isTargetSuperAdmin) {
+                        showActions = true;
+                    } else if (loggedInRole === 'Admin' && isTargetUser) {
+                        showActions = true;
+                    }
 
                     tr.innerHTML = `
                         <td class="ps-4 text-muted fw-semibold">${index + 1}</td>
@@ -910,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
-                            <span class="${showActions ? 'd-none' : 'text-muted small'}">${user.isSuperAdmin ? 'Protected' : 'No Access'}</span>
+                            <span class="${showActions ? 'd-none' : 'text-muted small'}">${isTargetSuperAdmin ? 'Protected' : 'No Access'}</span>
                         </td>`;
                     tableBody.appendChild(tr);
 

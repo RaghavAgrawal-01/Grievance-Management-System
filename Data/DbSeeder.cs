@@ -16,7 +16,7 @@ namespace GrievanceSystem.Data
             {
                 var superAdmin = new User
                 {
-                    Name = "Super Admin",
+                    Name = "Raghav",
                     Email = superAdminEmail,
                     Password = "SuperAdmin@123", // In production, this should be hashed
                     Role = "SuperAdmin",
@@ -26,11 +26,32 @@ namespace GrievanceSystem.Data
                 context.Users.Add(superAdmin);
                 await context.SaveChangesAsync();
             }
-            else if (!existingUser.IsSuperAdmin)
+            else
             {
-                // Ensure the specific email always has IsSuperAdmin flag
-                existingUser.IsSuperAdmin = true;
-                existingUser.Role = "SuperAdmin";
+                // Ensure the specific email always has correct values
+                bool changed = false;
+                if (existingUser.Name != "Raghav") { existingUser.Name = "Raghav"; changed = true; }
+                if (existingUser.Role != "SuperAdmin") { existingUser.Role = "SuperAdmin"; changed = true; }
+                if (!existingUser.IsSuperAdmin) { existingUser.IsSuperAdmin = true; changed = true; }
+                
+                if (changed)
+                {
+                    await context.SaveChangesAsync();
+                }
+            }
+
+            // Ensure NO ONE ELSE is SuperAdmin (Requirement: Ensure ONLY ONE SuperAdmin exists)
+            var otherSuperAdmins = await context.Users
+                .Where(u => u.Email != superAdminEmail && (u.Role == "SuperAdmin" || u.IsSuperAdmin))
+                .ToListAsync();
+
+            if (otherSuperAdmins.Any())
+            {
+                foreach (var other in otherSuperAdmins)
+                {
+                    other.Role = "Admin"; // Demote others to Admin
+                    other.IsSuperAdmin = false;
+                }
                 await context.SaveChangesAsync();
             }
         }

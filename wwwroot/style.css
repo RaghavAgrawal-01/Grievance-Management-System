@@ -226,6 +226,13 @@ a:hover {
   font-size: 0.875rem;
 }
 
+/* Larger avatar used in some pages (35px) */
+.avatar-lg {
+  width: 35px;
+  height: 35px;
+  font-size: 0.9rem;
+}
+
 .main-content {
   flex: 1;
   padding: 2rem;

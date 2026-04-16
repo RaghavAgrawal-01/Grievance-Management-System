@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using System.Security.Claims;
+using System.Text;
 
 namespace GrievanceSystem.Controllers
 {
@@ -186,6 +187,43 @@ namespace GrievanceSystem.Controllers
                 .ToListAsync();
 
             return Ok(grievances);
+        }
+
+        // =======================
+        // EXPORT (Admin Only) - returns CSV file
+        // =======================
+        [HttpGet("export")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
+        public async Task<IActionResult> Export()
+        {
+            var all = await _context.Grievances.OrderBy(g => g.Id).ToListAsync();
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Id,Name,Email,Subject,Description,TicketNumber,Status,FilePath,CreatedAt");
+
+            string Escape(string? value)
+            {
+                if (string.IsNullOrEmpty(value)) return string.Empty;
+                // double up quotes and wrap in quotes
+                return '"' + value.Replace("\"", "\"\"") + '"';
+            }
+
+            foreach (var g in all)
+            {
+                sb.Append(g.Id);
+                sb.Append(',');
+                sb.Append(Escape(g.Name)); sb.Append(',');
+                sb.Append(Escape(g.Email)); sb.Append(',');
+                sb.Append(Escape(g.Subject)); sb.Append(',');
+                sb.Append(Escape(g.Description)); sb.Append(',');
+                sb.Append(Escape(g.TicketNumber)); sb.Append(',');
+                sb.Append(Escape(g.Status)); sb.Append(',');
+                sb.Append(Escape(g.FilePath)); sb.Append(',');
+                sb.AppendLine(g.CreatedAt.ToString("o"));
+            }
+
+            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            return File(bytes, "text/csv", "grievances.csv");
         }
     }
 }

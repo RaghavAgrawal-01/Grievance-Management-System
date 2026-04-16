@@ -30,7 +30,7 @@ namespace GrievanceSystem.Controllers
             if (_context.Users.Any(u => u.Email == user.Email))
                 return BadRequest("User already exists");
 
-            // Forcibly set role to User and IsSuperAdmin to false for security
+            // ALWAYS assign role = "User" and ignore any role sent from frontend for security
             user.Role = "User";
             user.IsSuperAdmin = false;
 
@@ -55,7 +55,8 @@ namespace GrievanceSystem.Controllers
             return Ok(new { 
                 token, 
                 role = user.Role, 
-                isSuperAdmin = user.IsSuperAdmin 
+                isSuperAdmin = user.IsSuperAdmin,
+                name = user.Name
             });
         }
 
@@ -64,6 +65,7 @@ namespace GrievanceSystem.Controllers
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Email), // This ensures User.Identity.Name is the email
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role),
                 new Claim("IsSuperAdmin", user.IsSuperAdmin.ToString().ToLower())
@@ -102,40 +104,38 @@ namespace GrievanceSystem.Controllers
         [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> ChangeRole(int id, [FromBody] string newRole)
         {
-            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true");
+            var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == User.Identity.Name);
+            if (currentUser == null) return Unauthorized();
 
             if (newRole != "User" && newRole != "Admin" && newRole != "SuperAdmin")
                 return BadRequest("Invalid role");
 
-            var user = await _context.Users.FindAsync(id);
-            if (user == null) return NotFound("User not found");
+            var targetUser = await _context.Users.FindAsync(id);
+            if (targetUser == null) return NotFound("User not found");
 
-            // Safety Check: Cannot modify own role
-            if (currentUserId == user.Id.ToString())
-                return BadRequest("You cannot change your own role.");
+            // SELF PROTECTION: Cannot modify own role
+            if (currentUser.Id == targetUser.Id)
+                return BadRequest("You cannot modify your own account");
 
-            // Security Rule: Admin cannot change another Admin's role
-            if (user.Role == "Admin")
-                return BadRequest("Admin role cannot be changed by another user");
+            // PROTECTION: SuperAdmin target NEVER allowed
+            if (targetUser.Role == "SuperAdmin" || targetUser.IsSuperAdmin)
+                return BadRequest("SuperAdmin cannot be modified");
 
-            // Security Rule: SuperAdmin role protection
-            if (user.IsSuperAdmin || user.Role == "SuperAdmin")
-                return BadRequest("SuperAdmin role cannot be changed");
+            // PROTECTION: Admin target ONLY if currentUser is SuperAdmin
+            if (targetUser.Role == "Admin")
+            {
+                if (currentUser.Role != "SuperAdmin")
+                    return BadRequest("Only SuperAdmin can modify Admin");
+            }
 
-            // Only Users can be promoted to Admin
-            if (newRole == "Admin" && user.Role != "User")
-                return BadRequest("Only Users can be promoted to Admin.");
+            // TARGET IS USER: Allow Admin and SuperAdmin
+            // (Implicitly handled since only Admin/SuperAdmin can call this)
 
-            // Only SuperAdmin can promote others to SuperAdmin
-            if (newRole == "SuperAdmin" && !isSuperAdmin)
-                return StatusCode(403, "Only SuperAdmin can promote users to SuperAdmin role.");
-
-            user.Role = newRole;
-            user.IsSuperAdmin = (newRole == "SuperAdmin");
+            targetUser.Role = newRole;
+            targetUser.IsSuperAdmin = (newRole == "SuperAdmin");
             
             await _context.SaveChangesAsync();
-            return Ok(new { message = $"Role updated to {newRole}", id = user.Id, role = user.Role });
+            return Ok(new { message = $"Role updated to {newRole}", id = targetUser.Id, role = targetUser.Role });
         }
 
         // DELETE USER
@@ -143,33 +143,31 @@ namespace GrievanceSystem.Controllers
         [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> DeleteUser(int id)
         {
-            var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true");
-            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == User.Identity.Name);
+            if (currentUser == null) return Unauthorized();
 
-            var user = await _context.Users.FindAsync(id);
-            if (user == null) return NotFound("User not found");
+            var targetUser = await _context.Users.FindAsync(id);
+            if (targetUser == null) return NotFound("User not found");
 
-            // Security Rule: Admin and SuperAdmin users cannot be deleted
-            if (user.IsSuperAdmin || user.Role == "SuperAdmin")
-                return BadRequest("SuperAdmin cannot be deleted.");
+            // SELF PROTECTION: Cannot delete yourself
+            if (currentUser.Id == targetUser.Id)
+                return BadRequest("You cannot modify your own account");
 
-            if (user.Role == "Admin")
-                return BadRequest("Admin cannot be deleted");
+            // PROTECTION: SuperAdmin target NEVER allowed
+            if (targetUser.Role == "SuperAdmin" || targetUser.IsSuperAdmin)
+                return BadRequest("SuperAdmin cannot be deleted");
 
-            // Safety Check: Cannot delete yourself
-            if (currentUserId == user.Id.ToString())
-                return BadRequest("You cannot delete yourself.");
+            // PROTECTION: Admin target ONLY if currentUser is SuperAdmin
+            if (targetUser.Role == "Admin")
+            {
+                if (currentUser.Role != "SuperAdmin")
+                    return BadRequest("Only SuperAdmin can modify Admin"); // Or separate message if preferred, but requirement 9 says "Only SuperAdmin can modify Admin" for role and deletion tasks often share logic
+            }
 
-            // Only allow deleting normal users
-            if (user.Role != "User")
-                return BadRequest("Only normal users can be deleted.");
+            // TARGET IS USER: Allow Admin and SuperAdmin
+            // (Implicitly allowed for any Admin/SuperAdmin caller)
 
-            // Optional: You might still want to restrict DELETION power to SuperAdmins only
-            // If so, keep the following check. If Admins should be able to delete Users, remove it.
-            if (!isSuperAdmin)
-                return StatusCode(403, "You are not authorized to perform this action (SuperAdmin required)");
-
-            _context.Users.Remove(user);
+            _context.Users.Remove(targetUser);
             await _context.SaveChangesAsync();
             return Ok(new { message = "User deleted successfully" });
         }
