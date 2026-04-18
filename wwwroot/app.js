@@ -6,37 +6,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (currentPage.includes("admin.html")) {
         console.log("Admin page - skipping global redirect");
     } else {
-        const isPublicPage = currentPage.includes("index.html") || currentPage.includes("login.html") || currentPage.includes("register.html") || currentPage === "/" || currentPage === "";
+        const isPublicPage = currentPage.includes("index.html") || currentPage.includes("login.html") || currentPage.includes("register.html") || currentPage.includes("forgot-password.html") || currentPage.includes("reset-password.html") || currentPage === "/" || currentPage === "";
 
         if (!isPublicPage && !token) {
             window.location.href = "login.html";
             return;
         }
+    }
 
     // Extract initials from full name
     function getInitials(name) {
-        if (!name) return '';
+        if (!name) return '?';
         const parts = name.trim().split(/\s+/).filter(Boolean);
-        if (parts.length === 0) return '';
+        if (parts.length === 0) return '?';
         if (parts.length === 1) {
             return parts[0].substring(0, 2).toUpperCase();
         }
         const first = parts[0][0] || '';
-        const last  = parts[parts.length - 1][0] || '';
+        const last = parts[parts.length - 1][0] || '';
         return (first + last).toUpperCase();
     }
 
     // Render avatar initials into any element with class 'avatar' or id 'userAvatar'
     function renderAvatar() {
         const name = localStorage.getItem('name') || localStorage.getItem('email') || '';
-        const initials = getInitials(name) || '?';
+        const initials = getInitials(name);
         // elements using class 'avatar'
         document.querySelectorAll('.avatar').forEach(el => {
             el.textContent = initials;
         });
         const ua = document.getElementById('userAvatar');
         if (ua) ua.textContent = initials;
-    }
     }
 
     // Render avatar on load
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Exporting...';
 
             try {
-                const resp = await fetch('https://localhost:44392/api/GrievanceApi/export', {
+                const resp = await fetch('/api/GrievanceApi/export', {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -133,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.location.href = 'login.html';
                     return;
                 }
+
 
                 if (!resp.ok) {
                     const txt = await resp.text();
@@ -176,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if (loginAlert) loginAlert.classList.add('d-none');
 
-                    fetch('https://localhost:44392/api/Auth/login', {
+                    fetch('/api/Auth/login', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -258,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         formData.append('file', fileInput.files[0]);
                     }
 
-                    fetch('https://localhost:44392/api/GrievanceApi', {
+                    fetch('/api/GrievanceApi', {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${token}`
@@ -361,7 +362,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         registerAlert.classList.remove('alert-success', 'alert-danger');
                     }
 
-                    fetch('https://localhost:44392/api/Auth/register', {
+                    localStorage.setItem('name', name); // Save name immediately as requested
+
+                    fetch('/api/Auth/register', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -426,7 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const headers = { 'Content-Type': 'application/json' };
                     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-                    fetch(`https://localhost:44392/api/GrievanceApi/search/${encodeURIComponent(ticketId)}`, {
+                    fetch(`/api/GrievanceApi/search/${encodeURIComponent(ticketId)}`, {
                         method: 'GET',
                         headers: headers
                     })
@@ -496,6 +499,89 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                 }
             }
+
+            // Forgot Password Logic
+            if (form.id === 'forgotForm') {
+                event.preventDefault();
+                const email = document.getElementById('email').value;
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const alertEl = document.getElementById('forgotAlert');
+                const tokenContainer = document.getElementById('tokenContainer');
+                const tokenInput = document.getElementById('resetToken');
+
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
+                alertEl.classList.add('d-none');
+
+                fetch('/api/Auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error('User not found or something went wrong');
+                    return res.json();
+                })
+                .then(data => {
+                    alertEl.classList.remove('d-none', 'alert-danger');
+                    alertEl.classList.add('alert-success');
+                    alertEl.textContent = 'Token generated! Please copy it below.';
+                    tokenContainer.classList.remove('d-none');
+                    tokenInput.value = data.token;
+                })
+                .catch(err => {
+                    alertEl.classList.remove('d-none', 'alert-success');
+                    alertEl.classList.add('alert-danger');
+                    alertEl.textContent = err.message;
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Get Reset Token';
+                });
+            }
+
+            // Reset Password Logic
+            if (form.id === 'resetForm') {
+                event.preventDefault();
+                const tokenVal = document.getElementById('token').value;
+                const newPwd = document.getElementById('newPassword').value;
+                const confirmPwd = document.getElementById('confirmPassword').value;
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const alertEl = document.getElementById('resetAlert');
+
+                if (newPwd !== confirmPwd) {
+                    alertEl.classList.remove('d-none', 'alert-success');
+                    alertEl.classList.add('alert-danger');
+                    alertEl.textContent = 'Passwords do not match';
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Resetting...';
+
+                fetch('/api/Auth/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: tokenVal, newPassword: newPwd })
+                })
+                .then(res => {
+                    if (!res.ok) return res.text().then(t => { throw new Error(t || 'Reset failed'); });
+                    return res.json();
+                })
+                .then(data => {
+                    alertEl.classList.remove('d-none', 'alert-danger');
+                    alertEl.classList.add('alert-success');
+                    alertEl.textContent = 'Password reset successfully! Redirecting to login...';
+                    setTimeout(() => window.location.href = 'login.html', 3000);
+                })
+                .catch(err => {
+                    alertEl.classList.remove('d-none', 'alert-success');
+                    alertEl.classList.add('alert-danger');
+                    alertEl.textContent = err.message;
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Reset Password';
+                });
+            }
         });
     });
 
@@ -563,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </td></tr>`;
             }
 
-            fetch('https://localhost:44392/api/GrievanceApi', {
+            fetch('/api/GrievanceApi', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(res => {
@@ -688,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadGrievances();
 
         window.updateTicketStatus = function (id, newStatus) {
-            fetch(`https://localhost:44392/api/GrievanceApi/update-status/${id}`, {
+            fetch(`/api/GrievanceApi/update-status/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -762,7 +848,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing...'; }
             if (alertEl) alertEl.classList.add('d-none');
 
-            fetch('https://localhost:44392/api/GrievanceApi/my', {
+            fetch('/api/GrievanceApi/my', {
                 headers: { 'Authorization': `Bearer ${myToken}` }
             })
             .then(res => {
@@ -1370,7 +1456,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const btn = document.getElementById('profileSubmitBtn');
                 if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...'; }
 
-                fetch('https://localhost:44392/api/Auth/update-profile', {
+                fetch('/api/Auth/update-profile', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ name, email })
@@ -1421,7 +1507,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const btn = document.getElementById('pwdSubmitBtn');
                 if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...'; }
 
-                fetch('https://localhost:44392/api/Auth/change-password', {
+                fetch('/api/Auth/change-password', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ currentPassword: currentPwd, newPassword: newPwd })

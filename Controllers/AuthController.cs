@@ -215,6 +215,90 @@ namespace GrievanceSystem.Controllers
             await _context.SaveChangesAsync();
             return Ok(new { message = "Profile updated successfully", name = user.Name, email = user.Email });
         }
+
+        // FORGOT PASSWORD
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (user == null) return NotFound("User not found");
+
+            // Generate a reset token (JWT for simplicity)
+            var token = GenerateResetToken(user);
+            
+            // Return token as requested
+            return Ok(new { token });
+        }
+
+        // RESET PASSWORD
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            var email = ValidateResetToken(dto.Token);
+            if (email == null) return BadRequest("Invalid or expired token");
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null) return NotFound("User not found");
+
+            if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
+                return BadRequest("New password must be at least 6 characters");
+
+            user.Password = dto.NewPassword;
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Password reset successfully" });
+        }
+
+        private string GenerateResetToken(User user)
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim("purpose", "password_reset")
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _config["Jwt:Issuer"],
+                audience: _config["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(15),
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private string? ValidateResetToken(string token)
+        {
+            try
+            {
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var key = Encoding.UTF8.GetBytes(_config["Jwt:Key"]);
+                
+                var principal = tokenHandler.ValidateToken(token, new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = true,
+                    ValidIssuer = _config["Jwt:Issuer"],
+                    ValidateAudience = true,
+                    ValidAudience = _config["Jwt:Audience"],
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                }, out SecurityToken validatedToken);
+
+                var purpose = principal.FindFirst("purpose")?.Value;
+                if (purpose != "password_reset") return null;
+
+                return principal.FindFirst(ClaimTypes.Email)?.Value;
+            }
+            catch
+            {
+                return null;
+            }
+        }
     }
 }
 
@@ -229,4 +313,15 @@ public class UpdateProfileDto
 {
     public string? Name  { get; set; }
     public string? Email { get; set; }
+}
+
+public class ForgotPasswordDto
+{
+    public string Email { get; set; }
+}
+
+public class ResetPasswordDto
+{
+    public string Token { get; set; }
+    public string NewPassword { get; set; }
 }
