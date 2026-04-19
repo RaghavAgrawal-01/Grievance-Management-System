@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Complaints - GrievanceTrack</title>
+    <meta name="description" content="View all your submitted grievances and track their current status.">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .status-pill {
+            font-size: 0.78rem;
+            letter-spacing: 0.03em;
+        }
+        .ticket-row {
+            transition: background-color 0.15s ease;
+        }
+        .ticket-row:hover {
+            background-color: rgba(13, 110, 253, 0.04);
+        }
+        .stat-card {
+            border-left: 4px solid transparent;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1) !important;
+        }
+        .stat-card.pending  { border-left-color: #ffc107; }
+        .stat-card.progress { border-left-color: #0d6efd; }
+        .stat-card.resolved { border-left-color: #198754; }
+        .stat-card.total    { border-left-color: #6c757d; }
+
+        #myGrievancesTableBody tr td {
+            vertical-align: middle;
+        }
+        .empty-state {
+            padding: 64px 0;
+        }
+        .spinner-overlay {
+            padding: 48px 0;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0);   }
+        }
+        .fade-in {
+            animation: fadeIn 0.35s ease-out both;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="#">
+                <i class="fas fa-shield-alt me-2"></i> GrievanceTrack
+            </a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
+                    <li class="nav-item">
+                        <a class="nav-link" href="submit.html">Submit Grievance</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="search.html">Track Status</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active fw-semibold" href="my.html">
+                            <i class="fas fa-list-ul me-1"></i> My Complaints
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center mt-3 mt-lg-0">
+                    <div id="userAvatar" class="avatar avatar-lg bg-white text-primary fw-bold me-2" style="font-size:0.8rem;">?</div>
+                    <span id="userEmailDisplay" class="text-white-50 small ms-2 d-none d-lg-inline"></span>
+                    <a href="#" onclick="logout(); return false;" class="btn btn-sm btn-outline-light ms-3 border-0">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container my-5">
+
+        <!-- Page Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4 fade-in">
+            <div>
+                <h1 class="fw-bold mb-1 fs-3">
+                    <i class="fas fa-inbox text-primary me-2"></i> My Complaints
+                </h1>
+                <p class="text-muted mb-0 small">All grievances submitted under your account</p>
+            </div>
+            <a href="submit.html" class="btn btn-primary shadow-sm fw-semibold">
+                <i class="fas fa-plus me-1"></i> New Complaint
+            </a>
+        </div>
+
+        <!-- Alert Area -->
+        <div id="myGrievancesAlert" class="alert d-none mb-4" role="alert"></div>
+
+        <!-- Summary Stats -->
+        <div class="row g-3 mb-4 fade-in" id="statsRow">
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm border-0 rounded-4 stat-card total h-100">
+                    <div class="card-body py-3 px-4">
+                        <div class="text-muted small text-uppercase fw-semibold mb-1">Total</div>
+                        <div class="fs-3 fw-bold" id="myTotal">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm border-0 rounded-4 stat-card pending h-100">
+                    <div class="card-body py-3 px-4">
+                        <div class="text-muted small text-uppercase fw-semibold mb-1">Pending</div>
+                        <div class="fs-3 fw-bold text-warning" id="myPending">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm border-0 rounded-4 stat-card progress h-100">
+                    <div class="card-body py-3 px-4">
+                        <div class="text-muted small text-uppercase fw-semibold mb-1">In Progress</div>
+                        <div class="fs-3 fw-bold text-primary" id="myInProgress">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm border-0 rounded-4 stat-card resolved h-100">
+                    <div class="card-body py-3 px-4">
+                        <div class="text-muted small text-uppercase fw-semibold mb-1">Resolved</div>
+                        <div class="fs-3 fw-bold text-success" id="myResolved">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grievances Table -->
+        <div class="card shadow-sm border-0 rounded-4 overflow-hidden fade-in">
+            <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold text-dark">
+                    <i class="fas fa-table text-muted me-2"></i> Submitted Grievances
+                </span>
+                <button id="refreshBtn" class="btn btn-sm btn-outline-secondary" onclick="loadMyGrievances()">
+                    <i class="fas fa-sync-alt me-1"></i> Refresh
+                </button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light text-muted small text-uppercase">
+                        <tr>
+                            <th class="ps-4 py-3">Ticket #</th>
+                            <th class="py-3">Subject</th>
+                            <th class="py-3">Status</th>
+                            <th class="py-3">Submitted On</th>
+                        </tr>
+                    </thead>
+                    <tbody id="myGrievancesTableBody">
+                        <!-- Rows injected by JS -->
+                        <tr id="loadingRow">
+                            <td colspan="4" class="text-center spinner-overlay">
+                                <div class="spinner-border text-primary" role="status" style="width: 2rem; height: 2rem;">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <div class="text-muted mt-2 small">Fetching your grievances...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

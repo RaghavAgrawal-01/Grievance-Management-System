@@ -1,0 +1,16 @@
+@{
+    Layout = "_Layout";
+}
+
+<h2>Track Your Complaint</h2>
+
+<form asp-action="Track" method="post">
+    <div>
+        <label>Enter Ticket Number</label>
+        <input type="text" name="ticketNumber" required />
+    </div>
+
+    <button type="submit">Track</button>
+</form>
+
+<p style="color:red">@ViewBag.Message</p>
